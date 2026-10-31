@@ -1,0 +1,173 @@
+@import url('https://fonts.googleapis.cn/css2?family=Noto+Serif+SC:wght@400;600;700&display=swap');
+@import 'tailwindcss';
+@import 'tw-animate-css';
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --color-amber: var(--amber);
+  --color-amber-light: var(--amber-light);
+  --color-sage: var(--sage);
+  --color-crimson: var(--crimson);
+  --color-forest: var(--forest);
+  --color-parchment: var(--parchment);
+  --color-ink: var(--ink);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --radius-2xl: calc(var(--radius) + 8px);
+  --radius-3xl: calc(var(--radius) + 12px);
+  --radius-4xl: calc(var(--radius) + 16px);
+  --font-sans:
+    'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', ui-sans-serif,
+    system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto,
+    'Helvetica Neue', Arial, sans-serif;
+  --font-mono:
+    'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
+    'Liberation Mono', 'Courier New', monospace;
+  --font-serif:
+    'Noto Serif SC', 'Songti SC', 'SimSun', ui-serif, Georgia, Cambria,
+    'Times New Roman', Times, serif;
+}
+
+:root {
+  --radius: 0.5rem;
+  --background: #0c0b0a;
+  --foreground: #e8dcc8;
+  --card: #1c1915;
+  --card-foreground: #e8dcc8;
+  --popover: #1c1915;
+  --popover-foreground: #e8dcc8;
+  --primary: #c4955a;
+  --primary-foreground: #0c0b0a;
+  --secondary: #252118;
+  --secondary-foreground: #e8dcc8;
+  --muted: #1c1915;
+  --muted-foreground: #9a8e7a;
+  --accent: #252118;
+  --accent-foreground: #e8dcc8;
+  --destructive: #9b3a3a;
+  --border: #2a2520;
+  --input: #2a2520;
+  --ring: #c4955a;
+  --chart-1: #c4955a;
+  --chart-2: #4a7c59;
+  --chart-3: #9a8e7a;
+  --chart-4: #9b3a3a;
+  --chart-5: #d4a574;
+  --sidebar: #141210;
+  --sidebar-foreground: #e8dcc8;
+  --sidebar-primary: #c4955a;
+  --sidebar-primary-foreground: #0c0b0a;
+  --sidebar-accent: #252118;
+  --sidebar-accent-foreground: #e8dcc8;
+  --sidebar-border: #2a2520;
+  --sidebar-ring: #c4955a;
+  --amber: #c4955a;
+  --amber-light: #d4a574;
+  --sage: #7c9082;
+  --crimson: #9b3a3a;
+  --forest: #4a7c59;
+  --parchment: #e8dcc8;
+  --ink: #0c0b0a;
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+
+body {
+  @apply font-sans;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #141210;
+}
+::-webkit-scrollbar-thumb {
+  background: #2a2520;
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #c4955a;
+}
+
+/* Typewriter animation */
+@keyframes blink-caret {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+
+.typewriter-cursor::after {
+  content: '|';
+  animation: blink-caret 1s step-end infinite;
+  color: var(--amber);
+}
+
+/* Fade in animation */
+@keyframes fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in {
+  animation: fade-in 0.5s ease-out forwards;
+}
+
+/* Glow effect */
+.glow-amber {
+  box-shadow: 0 0 20px rgb(196 149 90 / 15%);
+}
+
+/* Game text styling */
+.game-text {
+  font-family: var(--font-mono);
+  line-height: 1.8;
+  letter-spacing: 0.02em;
+}

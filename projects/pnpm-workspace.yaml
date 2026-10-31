@@ -1,0 +1,7 @@
+# Windows 上 pnpm 默认的 junction 链接会让 Turbopack 无法解析 next/package.json，
+# 使用扁平 node_modules 以兼容构建。
+nodeLinker: hoisted
+# pnpm 11 默认拦截依赖的安装期脚本；这两项无需执行，显式跳过以免安装报错。
+allowBuilds:
+  sharp: false
+  unrs-resolver: false

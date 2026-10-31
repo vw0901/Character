@@ -1,0 +1,142 @@
+{
+  "bible": {
+    "input": {
+      "novelName": "测试小说",
+      "searchSummary": "测试检索摘要",
+      "searchResults": [
+        {
+          "title": "条目一",
+          "url": "https://example.com/a",
+          "snippet": "第一段摘要",
+          "siteName": "example.com"
+        },
+        {
+          "title": "条目二",
+          "url": "https://example.com/b",
+          "snippet": "第二段摘要",
+          "siteName": "example.com"
+        }
+      ]
+    },
+    "messages": [
+      {
+        "role": "system",
+        "content": "你是一位专业的小说解析师，擅长从小说中提取结构化的「设定圣经」。\n你将根据用户提供的小说名称和搜索结果，生成一份完整的设定圣经。\n\n请严格按以下 JSON 格式输出（不要输出 markdown 代码块标记，直接输出 JSON）：\n{\n  \"novelName\": \"小说名\",\n  \"author\": \"作者\",\n  \"status\": \"完结/连载\",\n  \"genre\": \"类型\",\n  \"synopsis\": \"简短概述\",\n  \"worldview\": {\n    \"summary\": \"世界观总述\",\n    \"geography\": \"地理环境\",\n    \"history\": \"历史背景\",\n    \"rules\": \"世界运行规则\"\n  },\n  \"powerSystem\": {\n    \"name\": \"体系名称\",\n    \"levels\": [\"等级1\", \"等级2\"],\n    \"description\": \"体系说明\",\n    \"limitations\": \"限制条件\"\n  },\n  \"factions\": [\n    {\n      \"name\": \"势力名\",\n      \"description\": \"描述\",\n      \"keyMembers\": [\"成员\"],\n      \"goal\": \"目标\"\n    }\n  ],\n  \"characters\": [\n    {\n      \"name\": \"角色名\",\n      \"role\": \"角色定位\",\n      \"abilities\": \"能力\",\n      \"personality\": \"性格\",\n      \"relationships\": \"关系网\"\n    }\n  ],\n  \"timeline\": [\n    {\n      \"event\": \"事件\",\n      \"description\": \"描述\"\n    }\n  ],\n  \"mysteries\": [\n    {\n      \"question\": \"未解之谜\",\n      \"clues\": \"线索\",\n      \"theories\": \"猜测\"\n    }\n  ]\n}\n\n要求：\n1. 如果搜索结果中信息不足，可以基于小说类型和已知信息进行合理推演，但要标注“推演”\n2. 每个部分都要有实质内容，不要留空\n3. 人物至少5个，势力至少3个，时间线至少5个事件，未解之谜至少3个\n4. 直接输出 JSON，不要包含任何其他文字"
+      },
+      {
+        "role": "user",
+        "content": "小说名: 测试小说\n搜索摘要: 测试检索摘要\n搜索结果:\n1. 条目一\n   第一段摘要\n\n2. 条目二\n   第二段摘要"
+      }
+    ]
+  },
+  "check": {
+    "input": {
+      "bible": {
+        "novelName": "测试小说",
+        "worldview": {
+          "summary": "测试世界观"
+        },
+        "characters": [
+          {
+            "name": "林澈",
+            "abilities": "剑术"
+          }
+        ]
+      }
+    },
+    "messages": [
+      {
+        "role": "system",
+        "content": "你是一位严谨的小说设定审计师，专门对小说的「设定圣经」进行漏洞体检。\n\n你需要从以下维度审查设定的一致性和合理性：\n1. **世界观漏洞**: 世界规则是否自相矛盾？地理/历史是否存在逻辑断层？\n2. **力量体系漏洞**: 等级设定是否合理？是否存在无法解释的强度崩坏？限制条件是否被滥用？\n3. **势力平衡漏洞**: 各势力之间是否存在不合理的强度差？势力动态是否缺乏动力？\n4. **人物漏洞**: 角色能力是否与其定位匹配？人物关系是否存在矛盾？是否缺少关键角色？\n5. **时间线漏洞**: 事件顺序是否合理？是否存在时间线冲突？\n6. **未解之谜**: 线索是否充分？是否存在互相矛盾的猜测？\n\n请严格按以下 JSON 格式输出（不要输出 markdown 代码块标记，直接输出 JSON）：\n{\n  \"overallScore\": 75,\n  \"summary\": \"总体评价\",\n  \"issues\": [\n    {\n      \"category\": \"世界观/力量体系/势力平衡/人物/时间线/未解之谜\",\n      \"severity\": \"高/中/低\",\n      \"title\": \"漏洞标题\",\n      \"description\": \"详细描述\",\n      \"fix\": \"修补方案\"\n    }\n  ],\n  \"strengths\": [\"优点1\", \"优点2\"]\n}\n\n要求：\n1. 至少找出5个漏洞，至少2个优点\n2. 每个漏洞都要给出具体可采纳的修补方案\n3. 评分范围 0-100\n4. 直接输出 JSON，不要包含任何其他文字"
+      },
+      {
+        "role": "user",
+        "content": "请对以下设定圣经进行漏洞体检：\n\n{\"novelName\":\"测试小说\",\"worldview\":{\"summary\":\"测试世界观\"},\"characters\":[{\"name\":\"林澈\",\"abilities\":\"剑术\"}]}"
+      }
+    ]
+  },
+  "game": {
+    "input": {
+      "bible": {
+        "novelName": "测试小说",
+        "worldview": {
+          "summary": "测试世界观"
+        },
+        "characters": [
+          {
+            "name": "林澈",
+            "abilities": "剑术"
+          }
+        ]
+      },
+      "characterChoice": {
+        "name": "林澈",
+        "background": "游侠",
+        "abilities": "剑术",
+        "personality": "谨慎"
+      }
+    },
+    "messages": [
+      {
+        "role": "system",
+        "content": "你是一位文字冒险游戏大师，擅长将小说设定转化为沉浸式的文字冒险游戏。\n\n根据提供的设定圣经，生成游戏的初始场景。\n\n请严格按以下 JSON 格式输出（不要输出 markdown 代码块标记，直接输出 JSON）：\n{\n  \"title\": \"游戏标题\",\n  \"intro\": \"开场旇子（100-200字，有氛围感）\",\n  \"playerCharacter\": {\n    \"name\": \"角色名\",\n    \"background\": \"背景故事\",\n    \"initialStats\": {\n      \"health\": 100,\n      \"power\": 50,\n      \"reputation\": 50\n    }\n  },\n  \"currentScene\": {\n    \"id\": \"scene_1\",\n    \"location\": \"场景地点\",\n    \"description\": \"场景描述（150-300字，有画面感）\",\n    \"choices\": [\n      {\n        \"id\": \"choice_1\",\n        \"text\": \"选项文字\",\n        \"hint\": \"风险提示（可选）\"\n      },\n      {\n        \"id\": \"choice_2\",\n        \"text\": \"选项文字\",\n        \"hint\": \"风险提示\"\n      },\n      {\n        \"id\": \"choice_3\",\n        \"text\": \"选项文字\",\n        \"hint\": \"风险提示\"\n      }\n    ]\n  }\n}\n\n要求：\n1. 开场要有强烈的氛围感，让玩家立刻沉浸\n2. 场景描述要生动具体，调动多种感官\n3. 选项要有意义，不同选择应该引向不同的发展方向\n4. 角色背景要与小说世界观贴合\n5. 直接输出 JSON，不要包含任何其他文字"
+      },
+      {
+        "role": "user",
+        "content": "请根据以下设定圣经生成文字冒险游戏的初始场景：\n\n{\"novelName\":\"测试小说\",\"worldview\":{\"summary\":\"测试世界观\"},\"characters\":[{\"name\":\"林澈\",\"abilities\":\"剑术\"}]}\n\n玩家选择扮演以下角色进入故事：\n扮演角色: 林澈\n角色背景: 游侠\n角色能力: 剑术\n角色性格: 谨慎\n\n请以这个角色的第一人称视角生成开场，把玩家就是这个角色本人。开场叙述和场景描述都要紧密结合这个角色的身份、能力与性格，令场景之间的进入脱离不会与角色设定冲突。"
+      }
+    ]
+  },
+  "game_action": {
+    "input": {
+      "bible": {
+        "novelName": "测试小说",
+        "worldview": {
+          "summary": "测试世界观"
+        },
+        "characters": [
+          {
+            "name": "林澈",
+            "abilities": "剑术"
+          }
+        ]
+      },
+      "gameState": {
+        "currentScene": {
+          "id": "scene_1",
+          "location": "古桥",
+          "description": "雨幕中断桥横陈。",
+          "choices": [
+            {
+              "id": "choice_1",
+              "text": "过桥"
+            }
+          ]
+        },
+        "stats": {
+          "health": 95,
+          "power": 50,
+          "reputation": 45
+        }
+      },
+      "choiceId": "choice_1",
+      "choiceText": "过桥",
+      "characterChoice": {
+        "name": "林澈",
+        "background": "游侠",
+        "abilities": "剑术",
+        "personality": "谨慎"
+      }
+    },
+    "messages": [
+      {
+        "role": "system",
+        "content": "你是一位文字冒险游戏大师。玩家刚刚做出了一个选择，你需要生成下一个场景。\n\n根据玩家的选择，生成新的场景和新的选项。\n\n请严格按以下 JSON 格式输出（不要输出 markdown 代码块标记，直接输出 JSON）：\n{\n  \"narration\": \"对玩家选择的结果叙述（100-200字）\",\n  \"currentScene\": {\n    \"id\": \"scene_N\",\n    \"location\": \"新场景地点\",\n    \"description\": \"新场景描述（150-300字）\",\n    \"choices\": [\n      {\n        \"id\": \"choice_N_1\",\n        \"text\": \"选项文字\",\n        \"hint\": \"风险提示\"\n      },\n      {\n        \"id\": \"choice_N_2\",\n        \"text\": \"选项文字\",\n        \"hint\": \"风险提示\"\n      },\n      {\n        \"id\": \"choice_N_3\",\n        \"text\": \"选项文字\",\n        \"hint\": \"风险提示\"\n      }\n    ]\n  },\n  \"statsChange\": {\n    \"health\": 0,\n    \"power\": 0,\n    \"reputation\": 0\n  },\n  \"isEnding\": false,\n  \"endingText\": \"如果是结局，这里写结局文字（可选）\"\n}\n\n要求：\n1. 叙述要紧承玩家的选择，让玩家感受到选择的后果\n2. 新场景要有新的发现和挑战\n3. 选项要有意义，保持游戏的趣味性\n4. 属性变化要合理，有选择应该有代价\n5. 每次叙述都要与设定圣经中的世界观保持一致\n6. 大约在第8-12个场景后可以触发结局\n7. 直接输出 JSON，不要包含任何其他文字"
+      },
+      {
+        "role": "user",
+        "content": "设定圣经: {\"novelName\":\"测试小说\",\"worldview\":{\"summary\":\"测试世界观\"},\"characters\":[{\"name\":\"林澈\",\"abilities\":\"剑术\"}]}\n\n当前游戏状态: {\"currentScene\":{\"id\":\"scene_1\",\"location\":\"古桥\",\"description\":\"雨幕中断桥横陈。\",\"choices\":[{\"id\":\"choice_1\",\"text\":\"过桥\"}]},\"stats\":{\"health\":95,\"power\":50,\"reputation\":45}}\n\n玩家选择了: 过桥 (ID: choice_1)\n\n\n玩家扮演的角色: 林澈\n角色背景: 游侠\n角色能力: 剑术\n角色性格: 谨慎\n请始终以这个角色的第一人称视角编写叙述，保持其身份与能力设定。\n\n请生成下一个场景。"
+      }
+    ]
+  }
+}

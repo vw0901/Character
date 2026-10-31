@@ -1,0 +1,69 @@
+# ===== 环境变量与凭据（切勿提交） =====
+.env
+.env.*
+!.env.example
+*.local
+.git-credentials
+.gitconfig-local
+credentials.json
+*.pem
+*.key
+*.token
+
+# ===== Python =====
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+pytest-cache-files-*/
+.mypy_cache/
+.ruff_cache/
+.tox/
+.coverage
+htmlcov/
+
+# ===== Node / 前端 =====
+node_modules/
+node_modules.*/
+.pnpm-store/
+.pnp
+.pnp.*
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+.eslintcache
+.stylelintcache
+
+# ===== 构建产物（由 start 脚本生成） =====
+projects/.next/
+projects/out/
+projects/build/
+projects/dist/
+*.tsbuildinfo
+backend/app/static/*
+!backend/app/static/.gitkeep
+
+# ===== 日志与临时文件 =====
+*.log
+logs/
+*.tmp
+*.temp
+.tmp/
+
+# ===== 测试与覆盖率 =====
+coverage/
+.nyc_output/
+
+# ===== 编辑器 / 系统 =====
+.idea/
+.vscode/
+*.suo
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+Desktop.ini
