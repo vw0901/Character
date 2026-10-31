@@ -1,185 +1,107 @@
-# Character · 小说设定圣经与 AI 文字冒险
+# 假如是你
 
-输入一部小说，自动检索资料、生成结构化的「设定圣经」、体检设定漏洞，再以这部小说为舞台开始一段可选择的文字冒险。
+> 输入一部小说，生成它的设定圣经，再以「你」为主角走进故事。
 
-前端使用 Next.js 静态导出，运行期由 FastAPI 同源托管；生产环境只需要 Python。
+一个跑在自己电脑上的 AI 小工具：**搜资料 → 生成世界观/人物/势力 → 体检设定漏洞 → 开始文字冒险**。
 
-## 功能
+## 一行启动
 
-- **检索**：按小说名搜索作者、状态、世界观等公开资料；未配置检索服务时由模型知识兜底。
-- **设定圣经**：汇总世界观、力量体系、势力、人物、时间线、悬念与线索。
-- **设定体检**：给出整体评分、逻辑漏洞与可执行的修复建议。
-- **文字冒险**：选择或自定义角色，进入场景、做出选择，生命/战力/声望随之变化。
-- **多服务商**：内置 OpenAI、DeepSeek、Ollama、火山方舟、阿里百炼、硅基流动、Moonshot、智谱预设，也可填任意 OpenAI 兼容接口。
+需要先安装 [Python 3.12+](https://www.python.org/downloads/)。
 
-## 技术栈
-
-| 层 | 技术 |
-|---|---|
-| 前端 | Next.js 16（App Router、静态导出）、React 19、TypeScript、Tailwind CSS 4 |
-| 后端 | FastAPI、Pydantic、OpenAI Python SDK、httpx |
-| 测试 | pytest、respx、TypeScript / ESLint / Stylelint |
-
-## 目录结构
-
-```
-character/
-├── backend/                    FastAPI 服务
-│   ├── app/
-│   │   ├── ai/                 OpenAI 客户端、检索、SSE、prompt
-│   │   ├── routers/            /api/search、bible、check、game…
-│   │   ├── static/             前端构建产物（由脚本生成，不提交）
-│   │   └── main.py             应用入口与静态托管
-│   ├── tests/                  pytest 契约测试
-│   ├── mock_openai_server.py   本地 OpenAI 兼容 mock 服务
-│   ├── requirements.txt        运行依赖
-│   └── requirements-dev.txt    测试依赖
-├── projects/                   Next.js 前端（仅构建期需要 Node.js）
-│   ├── src/app/                页面、布局、全局样式
-│   ├── src/components/         业务组件
-│   └── src/lib/ai/             浏览器配置与 SSE 解析
-├── start.ps1 / start.sh        一键启动
-└── README.md
-```
-
-## 快速开始
-
-前置条件：Python 3.12+；若需要构建前端，另需 Node.js 20.9+ 与 pnpm 9+。
-
-**Windows**
+**Windows**：双击 `start.cmd`，或在终端执行：
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\start.ps1
+python start.py
 ```
 
-**macOS / Linux**
+**macOS / Linux**：
 
 ```bash
-chmod +x start.sh
-./start.sh
+python3 start.py
 ```
 
-首次运行会自动创建虚拟环境、安装依赖、生成 `backend/.env`、构建前端静态文件并同步到 `backend/app/static`，随后启动服务。
+首次启动会自动创建虚拟环境、安装依赖、生成配置并打开浏览器；以后同样一条命令即可。
 
-打开 <http://127.0.0.1:5000>，点击右上角「AI 设置」，填写 OpenAI 兼容服务的 Base URL、API Key 与模型名称即可。
-
-常用参数：
-
-| PowerShell / Bash | 说明 |
-|---|---|
-| `-Port 8000` / `--port 8000` | 监听端口，默认 `5000` |
-| `-HostAddr 0.0.0.0` / `--host 0.0.0.0` | 监听地址，默认 `127.0.0.1` |
-| `-Rebuild` / `--rebuild` | 强制重新构建前端 |
-
-### 开发模式
-
-开发模式可热更新，前端 `3000` 端口的 `/api` 会自动代理到后端 `8000`。
-
-```powershell
-# 终端 1：后端
-cd backend
-python -m venv .venv
-.\.venv\Scripts\pip install -r requirements-dev.txt
-Copy-Item .env.example .env
-.\run.ps1 -Port 8000 -Reload
-
-# 终端 2：前端
-cd projects
-pnpm install
-pnpm dev
-```
-
-Unix 下把 `pip`、`Copy-Item`、`run.ps1` 换成 `pip3`、`cp`、`./run.sh`，并设置 `PORT=8000 RELOAD=1`。
-
-## 配置
-
-### 浏览器内配置（推荐）
-
-「AI 设置」页填写的配置保存在浏览器 `localStorage`，随每次 API 请求发送给本地后端，后端不落盘。页面提供「测试连接」「获取模型」「清除配置」。
-
-### 后端环境变量（兜底）
-
-未在浏览器保存配置时读取 `backend/.env`：
-
-| 变量 | 默认 | 说明 |
-|---|---|---|
-| `OPENAI_BASE_URL` | 空 | OpenAI 兼容接口地址，缺少 `/v1` 时自动补全 |
-| `OPENAI_API_KEY` | 空 | API Key；本地模型可留空 |
-| `OPENAI_MODEL` | 空 | 模型名称 |
-| `AI_SEARCH_PROVIDER` | `none` | `none` 或 `tavily` |
-| `TAVILY_API_KEY` | 空 | 启用 Tavily 检索时必填 |
-| `AI_TIMEOUT` | `300` | 单次 AI 请求超时（秒） |
-
-也兼容 `AI_BASE_URL`、`AI_API_KEY`、`AI_MODEL` 别名。可从 `.env.example` 复制：
+想从零开始，也可以一行完成：
 
 ```bash
-cp backend/.env.example backend/.env
+git clone https://github.com/vw0901/Character.git && cd Character && python start.py
 ```
 
-## 构建与部署
+启动后默认地址：<http://127.0.0.1:5000>
 
-```powershell
-# 构建前端并同步到后端静态目录
-powershell -ExecutionPolicy Bypass -File .\start.ps1 -Rebuild -Port 8000
+> 前端页面已经随仓库提供，**日常使用只需要 Python**，不需要 Node.js。
+
+## 第一次使用
+
+1. 打开页面，点右上角 **齿轮**。
+2. 选一个服务商预设，或填任意 OpenAI 兼容接口。
+3. 填 **Base URL、API Key、模型名**，点「测试连接」→「保存设置」。
+4. 回到首页，输入小说名（如《三体》）→ 检索 → 生成设定圣经 → 设定体检 → 开始冒险。
+
+**没有 API Key？**
+
+- 本地装 [Ollama](https://ollama.com/)，选 `Ollama` 预设，Key 留空即可。
+- 或使用 DeepSeek、智谱、硅基流动等服务商的兼容接口，填自己的 Key。
+
+配置只保存在当前浏览器里，不会写进项目文件。
+
+## 常用参数
+
+```bash
+python start.py --port 8000       # 换端口
+python start.py --host 0.0.0.0    # 允许局域网访问（注意安全）
+python start.py --no-browser      # 不自动打开浏览器
+python start.py --rebuild         # 重新构建前端（需要 Node 20.9+ / pnpm 9+）
 ```
 
-等价的手动步骤：
+## 遇到问题
 
-```powershell
-cd projects
-pnpm install
-pnpm build
-$static = Resolve-Path ..\backend\app\static
-Get-ChildItem $static -Force | Where-Object Name -ne '.gitkeep' | Remove-Item -Recurse -Force
-Copy-Item .\out\* $static -Recurse -Force
+| 现象 | 处理 |
+|---|---|
+| 提示需要 Python 3.12+ | 升级 Python，Windows 建议用 python.org 安装包 |
+| 端口被占用 | `python start.py --port 8001` |
+| 页面 404 / 空白 | `python start.py --rebuild`（需 Node + pnpm） |
+| AI 报 401 / 403 | Key 不对或没权限，重新填写并测试连接 |
+| AI 报 404 | 检查 Base URL（通常以 `/v1` 结尾）和模型名 |
+| 想恢复默认 | 删除 `backend/.env`，并在页面点「清除配置」 |
 
-cd ..\backend
-Copy-Item .env.example .env
-.\run.ps1 -Port 5000
-```
+## 它包含什么
 
-生产机只要 Python 与 `backend/app/static`，无需安装 Node.js。默认仅监听 `127.0.0.1`；若通过反向代理对外提供服务，请在代理层增加身份认证与 HTTPS。
+- **小说检索**：获取作者、状态、世界观等公开资料；未配置检索时由模型知识兜底。
+- **设定圣经**：世界观、力量体系、势力、人物、时间线、悬念线索。
+- **设定体检**：整体评分、逻辑漏洞、可直接采用的修复建议。
+- **文字冒险**：选角色或自定义身份，在场景中做选择，生命/战力/声望随之变化。
+- **多服务商**：OpenAI、DeepSeek、Ollama、火山方舟、阿里百炼、硅基流动、Moonshot、智谱。
 
-## 测试
+## 隐私
 
-```powershell
+- 不需要注册，不收集数据；配置只存在本机浏览器 `localStorage`，随请求发给本机后端。
+- 仓库不包含 `.env`、API Key、虚拟环境或依赖目录。
+- 默认只监听 `127.0.0.1`；只有你填写的 AI 服务会收到请求。
+- 共用电脑请离开前点「清除配置」。
+
+## 开发者
+
+| 目录 | 说明 |
+|---|---|
+| `projects/` | Next.js 16 + React 19 + Tailwind 4，静态导出 |
+| `backend/` | FastAPI，托管静态页面并提供 `/api/*` |
+| `backend/tests/` | pytest 契约测试与 prompt 快照 |
+| `start.py` | 跨平台一键启动脚本 |
+
+```bash
+# 后端测试
 cd backend
 python -m venv .venv
-.\.venv\Scripts\pip install -r requirements-dev.txt
-.\.venv\Scripts\python -m pytest -q
+.venv/Scripts/pip install -r requirements-dev.txt   # macOS/Linux: .venv/bin/pip
+.venv/Scripts/python -m pytest -q
 
-cd ..\projects
+# 前端检查 / 开发
+cd projects
 pnpm install
 pnpm validate
+pnpm dev        # http://127.0.0.1:3000，/api 代理到 8000
 ```
 
-`backend/tests/fixtures/expected_messages.json` 保存了 prompt 的完整 messages 快照，`test_prompts.py` 会逐字段校验，避免改动 prompt 时悄悄改变行为。
-
-## 接口
-
-| 方法 | 路径 | 说明 |
-|---|---|---|
-| POST | `/api/search` | 检索小说资料，返回 JSON |
-| POST | `/api/bible` | 生成设定圣经，SSE |
-| POST | `/api/check` | 设定漏洞体检，SSE |
-| POST | `/api/game` | 生成游戏初始场景，SSE |
-| POST | `/api/game/action` | 生成下一场景，SSE |
-| POST | `/api/models` | 获取模型列表 |
-| POST | `/api/ai/test` | 测试 AI 连接 |
-| GET | `/healthz` | 健康检查 |
-
-SSE 数据块为 `data: {"text":"..."}`，以 `data: [DONE]` 结束；错误块为 `data: {"error":"..."}`。接口文档见 `/docs`。
-
-## 隐私与安全
-
-- 仓库不包含 `.env`、API Key、虚拟环境、`node_modules` 或构建产物；`start` 脚本也不会写入任何凭据到版本库。
-- 浏览器设置中的 API Key 仅保存在本机 `localStorage`，随请求发往**本机**后端；后端只在内存中使用，不写日志、不落盘。共用电脑请用「清除配置」。
-- Tavily Key 只通过 `Authorization` 请求头发送。
-- 未知异常只向前端返回通用提示，避免服务端响应片段或凭据被回显。
-- 默认绑定 `127.0.0.1`，不对外网开放。如需公网访问，务必在反向代理层启用 HTTPS 与访问控制，并限制 `/docs` 与 `/openapi.json`。
-- 若曾把 `.env` 或 Key 误提交到 Git，请立即在服务商侧吊销并轮换。
-
-## 相关文档
-
-- `projects/AGENTS.md`：前端编码与 UI 约定
-- `projects/DESIGN.md`：视觉设计说明
+接口文档在服务启动后访问 `/docs`。更多编码约定见 `projects/AGENTS.md`，视觉规范见 `projects/DESIGN.md`。

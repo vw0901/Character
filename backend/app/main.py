@@ -7,7 +7,7 @@ from app.config import STATIC_DIR
 from app.routers import ai_test, bible, check, game, game_action, models, search
 
 
-app = FastAPI(title="novel-setting-bible")
+app = FastAPI(title="假如是你", description="小说设定圣经与 AI 文字冒险")
 
 
 @app.exception_handler(RequestValidationError)

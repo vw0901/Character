@@ -70,10 +70,10 @@ export function SearchPhase({ onSearchComplete }: SearchPhaseProps) {
 
         {/* Title */}
         <h1 className="font-serif text-4xl md:text-5xl font-bold text-parchment mb-4 tracking-wide">
-          {"\u5c0f\u8bf4\u8bbe\u5b9a\u5723\u7ecf"}
+          {"\u5047\u5982\u662f\u4f60"}
         </h1>
         <p className="text-muted-foreground text-lg mb-12 max-w-md mx-auto">
-          {"\u8f93\u5165\u4e00\u90e8\u5c0f\u8bf4\u7684\u540d\u5b57\uff0c\u6211\u4eec\u5c06\u89e3\u6790\u5b83\u7684\u4e16\u754c\u89c2\u3001\u529b\u91cf\u4f53\u7cfb\u3001\u4eba\u7269\u5173\u7cfb\uff0c\u5e76\u5c06\u5b83\u8f6c\u5316\u4e3a\u4e00\u573a\u53ef\u73a9\u7684\u6587\u5b57\u5192\u9669"}
+          {"\u8f93\u5165\u4e00\u90e8\u5c0f\u8bf4\uff0c\u751f\u6210\u5b83\u7684\u8bbe\u5b9a\u5723\u7ecf\uff0c\u518d\u4ee5\u300c\u4f60\u300d\u4e3a\u4e3b\u89d2\u8d70\u8fdb\u6545\u4e8b"}
         </p>
 
         {/* Search Input */}

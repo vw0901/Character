@@ -37,14 +37,14 @@ pnpm-debug.log*
 .eslintcache
 .stylelintcache
 
-# ===== 构建产物（由 start 脚本生成） =====
+# ===== 构建产物（由 start.py --rebuild 生成） =====
 projects/.next/
 projects/out/
 projects/build/
 projects/dist/
 *.tsbuildinfo
-backend/app/static/*
-!backend/app/static/.gitkeep
+# 静态站点随仓库提供，保证只用 Python 即可启动；源映射不提交
+backend/app/static/**/*.map
 
 # ===== 日志与临时文件 =====
 *.log

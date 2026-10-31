@@ -5,7 +5,7 @@
 - **Framework**: Next.js 16 (App Router，静态导出)
 - **Core**: React 19
 - **Language**: TypeScript 5
-- **UI 组件**: shadcn/ui (基于 Radix UI)
+- **UI 组件**: shadcn/ui（按需生成）
 - **Styling**: Tailwind CSS 4
 - **后端**: FastAPI（位于同级 `../backend/`，同源托管静态产物）
 
@@ -28,7 +28,7 @@
 
 - 前端仅做静态导出，API 由同级 `../backend/` 的 FastAPI 提供；生产运行时不依赖 Node.js。
 - 项目文件（如 app 目录、pages 目录、components 等）默认初始化到 `src/` 目录下。
-- 一键启动脚本与完整说明位于仓库根目录：`../start.ps1`、`../start.sh`、`../README.md`。
+- 一键启动脚本与完整说明位于仓库根目录：`../start.py`、`../start.cmd`、`../README.md`。
 
 ## 包管理规范
 
