@@ -69,6 +69,12 @@ class GameActionRequest(APIModel):
     ai_config: AiConfig | None = Field(default=None, alias="aiConfig")
 
 
+class RepairRequest(APIModel):
+    bible: dict[str, Any]
+    check: dict[str, Any] | None = None
+    ai_config: AiConfig | None = Field(default=None, alias="aiConfig")
+
+
 class ModelsRequest(APIModel):
     ai_config: AiConfig | None = Field(default=None, alias="aiConfig")
     base_url: str | None = Field(default=None, alias="baseUrl")

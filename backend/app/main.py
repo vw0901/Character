@@ -4,7 +4,18 @@ from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from app.config import STATIC_DIR
-from app.routers import ai_test, bible, check, game, game_action, models, search
+from app.routers import (
+    ai_test,
+    bible,
+    check,
+    game,
+    game_action,
+    meta,
+    models,
+    projects,
+    repair,
+    search,
+)
 
 
 app = FastAPI(title="假如是你", description="小说设定圣经与 AI 文字冒险")
@@ -19,10 +30,13 @@ for router in (
     search.router,
     bible.router,
     check.router,
+    repair.router,
     game.router,
     game_action.router,
     models.router,
     ai_test.router,
+    projects.router,
+    meta.router,
 ):
     app.include_router(router, prefix="/api")
 

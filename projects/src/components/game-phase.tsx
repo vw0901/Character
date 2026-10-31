@@ -4,26 +4,63 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import Link from "next/link";
 import {
   Gamepad2, Heart, Zap, Star, Loader2, RotateCcw,
-  ChevronRight, Skull, User, UserPlus, Wand2,
+  ChevronRight, Skull, User, UserPlus, Wand2, Undo2, Download,
 } from "lucide-react";
 import { withAiConfig } from "@/lib/ai/browser";
 import { readSseText } from "@/lib/ai/sse";
-import type { SettingBible, GameState, SceneResult, CharacterChoice } from "@/app/page";
+import {
+  MAX_UNDO_SNAPSHOTS,
+  normalizeGameState,
+  normalizeSceneResult,
+  parseJsonLoose,
+  type AdventureSnapshot,
+  type AdventureState,
+  type CharacterChoice,
+  type GameState,
+  type ProjectDocument,
+  type SaveState,
+  type SceneResult,
+  type SettingBible,
+  type StatValues,
+} from "@/lib/project";
 
 interface GamePhaseProps {
+  project: ProjectDocument;
   bible: SettingBible;
-  gameState: GameState | null;
-  setGameState: (state: GameState | null) => void;
+  adventure: AdventureState | null;
+  saveState: SaveState;
+  onAdventureChange: (adventure: AdventureState | null) => void;
+  onExport: () => void;
   onRestart: () => void;
 }
 
+const DEFAULT_STATS: StatValues = { health: 100, power: 50, reputation: 50 };
+
+const SAVE_LABELS: Record<SaveState, string> = {
+  idle: "未保存",
+  saving: "保存中…",
+  saved: "已保存到本机",
+  error: "保存失败",
+};
+
+function clampStats(base: StatValues, change: Partial<StatValues>): StatValues {
+  const clamp = (value: number) => Math.max(0, Math.min(100, Math.round(value)));
+  return {
+    health: clamp(base.health + (change.health ?? 0)),
+    power: clamp(base.power + (change.power ?? 0)),
+    reputation: clamp(base.reputation + (change.reputation ?? 0)),
+  };
+}
+
 export function GamePhase({
+  project,
   bible,
-  gameState,
-  setGameState,
+  adventure,
+  saveState,
+  onAdventureChange,
+  onExport,
   onRestart,
 }: GamePhaseProps) {
-  const [selectedCharacter, setSelectedCharacter] = useState<CharacterChoice | null>(null);
   const [mode, setMode] = useState<"existing" | "custom">("existing");
   const [customName, setCustomName] = useState("");
   const [customBg, setCustomBg] = useState("");
@@ -34,47 +71,29 @@ export function GamePhase({
   const [isProcessing, setIsProcessing] = useState(false);
   const [narration, setNarration] = useState("");
   const [displayedText, setDisplayedText] = useState("");
-  const [stats, setStats] = useState({ health: 100, power: 50, reputation: 50 });
-  const [history, setHistory] = useState<Array<{ type: "narration" | "choice"; text: string }>>([]);
-  const [isEnding, setIsEnding] = useState(false);
-  const [endingText, setEndingText] = useState("");
   const [rawText, setRawText] = useState("");
   const [error, setError] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
   const typewriterRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const fullTextRef = useRef<string>("");
+  const initKeyRef = useRef("");
 
   const characters = bible.characters || [];
+  const character = adventure?.character ?? null;
+  const gameState = adventure?.gameState ?? null;
+  const stats = adventure?.stats ?? DEFAULT_STATS;
+  const history = adventure?.history ?? [];
+  const isEnding = adventure?.isEnding ?? false;
+  const endingText = adventure?.endingText ?? "";
+  const currentScene = gameState?.currentScene;
+  const canUndo = Boolean(adventure && adventure.snapshots.length > 0 && !isProcessing);
 
-  const parseGameState = useCallback((text: string): GameState | null => {
-    try {
-      const cleaned = text.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
-      const json = JSON.parse(cleaned);
-      return json as GameState;
-    } catch {
-      return null;
-    }
-  }, []);
-
-  const parseSceneResult = useCallback((text: string): SceneResult | null => {
-    try {
-      const cleaned = text.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
-      const json = JSON.parse(cleaned);
-      return json as SceneResult;
-    } catch {
-      return null;
-    }
-  }, []);
-
-  // Initialize game only after a character is chosen
+  // 选好角色但没有初始场景时，生成开场。
   useEffect(() => {
-    if (!selectedCharacter) return;
-    if (gameState) {
-      setDisplayedText(gameState.intro);
-      setStats(gameState.playerCharacter.initialStats);
-      setHistory([{ type: "narration", text: gameState.intro }]);
-      return;
-    }
+    if (!adventure?.character || adventure.gameState) return;
+    const key = `${adventure.character.name}:${adventure.startedAt}`;
+    if (initKeyRef.current === key) return;
+    initKeyRef.current = key;
 
     const initGame = async () => {
       setIsInitializing(true);
@@ -86,7 +105,7 @@ export function GamePhase({
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(
-            withAiConfig({ bible, characterChoice: selectedCharacter })
+            withAiConfig({ bible, characterChoice: adventure.character })
           ),
         });
 
@@ -96,18 +115,26 @@ export function GamePhase({
           setRawText(accumulated);
         }
 
-        const parsed = parseGameState(accumulated);
+        const parsed = normalizeGameState(parseJsonLoose(accumulated));
         if (parsed) {
-          // Ensure the player character reflects the chosen identity
-          parsed.playerCharacter = {
-            name: selectedCharacter.name,
-            background: selectedCharacter.background,
-            initialStats: parsed.playerCharacter?.initialStats || { health: 100, power: 50, reputation: 50 },
+          const initialStats = parsed.playerCharacter.initialStats ?? DEFAULT_STATS;
+          const nextState: GameState = {
+            ...parsed,
+            playerCharacter: {
+              name: adventure.character.name,
+              background: adventure.character.background || parsed.playerCharacter.background,
+              initialStats,
+            },
           };
-          setGameState(parsed);
-          setDisplayedText(parsed.intro);
-          setStats(parsed.playerCharacter.initialStats);
-          setHistory([{ type: "narration", text: parsed.intro }]);
+          onAdventureChange({
+            ...adventure,
+            gameState: nextState,
+            stats: initialStats,
+            history: [{ type: "narration", text: parsed.intro }],
+            isEnding: false,
+            endingText: "",
+          });
+          setNarration(parsed.intro);
         } else if (!accumulated) {
           setError("AI 服务未返回内容，请检查服务配置后重试");
         } else {
@@ -126,8 +153,8 @@ export function GamePhase({
       }
     };
 
-    initGame();
-  }, [bible, gameState, selectedCharacter, setGameState, parseGameState]);
+    void initGame();
+  }, [adventure, bible, onAdventureChange]);
 
   // Typewriter effect
   useEffect(() => {
@@ -165,25 +192,46 @@ export function GamePhase({
     }
   }, [history, displayedText]);
 
-  const handleSelectCharacter = (character: (typeof characters)[number]) => {
-    const roleText = character.role ? `身份：${character.role}` : "";
-    const abilityText = character.abilities ? `能力：${character.abilities}` : "";
-    const relationText = character.relationships ? `关系：${character.relationships}` : "";
-    const personalityText = character.personality ? `性格：${character.personality}` : "";
-    setSelectedCharacter({
+  const startAdventure = useCallback(
+    (next: CharacterChoice) => {
+      onAdventureChange({
+        character: next,
+        gameState: null,
+        stats: DEFAULT_STATS,
+        history: [],
+        isEnding: false,
+        endingText: "",
+        turn: 0,
+        snapshots: [],
+        startedAt: new Date().toISOString(),
+      });
+      setNarration("");
+      setDisplayedText("");
+      setError("");
+    },
+    [onAdventureChange]
+  );
+
+  const handleSelectCharacter = (selected: (typeof characters)[number]) => {
+    const roleText = selected.role ? `身份：${selected.role}` : "";
+    const abilityText = selected.abilities ? `能力：${selected.abilities}` : "";
+    const relationText = selected.relationships ? `关系：${selected.relationships}` : "";
+    const personalityText = selected.personality ? `性格：${selected.personality}` : "";
+    startAdventure({
       mode: "existing",
-      name: character.name,
-      background: [roleText, abilityText, relationText, personalityText]
-        .filter(Boolean)
-        .join("；") || "故事中的关键人物",
-      abilities: character.abilities,
-      personality: character.personality,
+      name: selected.name,
+      background:
+        [roleText, abilityText, relationText, personalityText]
+          .filter(Boolean)
+          .join("；") || "故事中的关键人物",
+      abilities: selected.abilities,
+      personality: selected.personality,
     });
   };
 
   const handleCreateCustom = () => {
     if (!customName.trim()) return;
-    setSelectedCharacter({
+    startAdventure({
       mode: "custom",
       name: customName.trim(),
       background: customBg.trim() || "一位刚刚踏入小说世界的旅人",
@@ -193,9 +241,27 @@ export function GamePhase({
   };
 
   const handleChoice = async (choiceId: string, choiceText: string) => {
-    if (isProcessing) return;
+    if (isProcessing || !adventure?.gameState) return;
 
-    setHistory((prev) => [...prev, { type: "choice", text: choiceText }]);
+    const current = adventure;
+    const currentState = current.gameState;
+    if (!currentState) return;
+
+    const snapshot: AdventureSnapshot = {
+      gameState: currentState,
+      stats: current.stats,
+      history: current.history,
+      isEnding: current.isEnding,
+      endingText: current.endingText,
+      turn: current.turn,
+    };
+    const historyWithChoice = [
+      ...current.history,
+      { type: "choice" as const, text: choiceText },
+    ];
+
+    // 先乐观展示玩家的选择；失败时回滚到 current，不会重复记录。
+    onAdventureChange({ ...current, history: historyWithChoice });
     setIsProcessing(true);
     setNarration("");
     setError("");
@@ -207,14 +273,10 @@ export function GamePhase({
         body: JSON.stringify(
           withAiConfig({
             bible,
-            gameState: {
-              ...gameState,
-              currentScene: gameState?.currentScene,
-              stats,
-            },
+            gameState: { ...currentState, stats: current.stats },
             choiceId,
             choiceText,
-            characterChoice: selectedCharacter,
+            characterChoice: current.character,
           })
         ),
       });
@@ -224,35 +286,40 @@ export function GamePhase({
         accumulated += text;
       }
 
-      const result = parseSceneResult(accumulated);
-      if (result) {
-        setStats((prev) => ({
-          health: Math.max(0, Math.min(100, prev.health + (result.statsChange?.health || 0))),
-          power: Math.max(0, Math.min(100, prev.power + (result.statsChange?.power || 0))),
-          reputation: Math.max(0, Math.min(100, prev.reputation + (result.statsChange?.reputation || 0))),
-        }));
+      const result: SceneResult | null = normalizeSceneResult(
+        parseJsonLoose(accumulated)
+      );
 
-        if (result.isEnding) {
-          setIsEnding(true);
-          setEndingText(result.endingText || "");
-          setHistory((prev) => [...prev, { type: "narration", text: result.narration }]);
-          setNarration(result.narration);
-        } else {
-          const newState: GameState = {
-            ...gameState!,
-            currentScene: result.currentScene,
-          };
-          setGameState(newState);
-          setHistory((prev) => [...prev, { type: "narration", text: result.narration }]);
-          setNarration(result.narration);
-        }
-      } else if (!accumulated) {
-        setError("AI 服务未返回内容，请检查服务配置后重试");
+      if (result) {
+        const nextStats = clampStats(current.stats, result.statsChange);
+        const narrationText = result.narration || result.endingText || "";
+        onAdventureChange({
+          ...current,
+          gameState: result.isEnding
+            ? currentState
+            : { ...currentState, currentScene: result.currentScene },
+          stats: nextStats,
+          history: [
+            ...historyWithChoice,
+            { type: "narration", text: narrationText },
+          ],
+          isEnding: result.isEnding,
+          endingText: result.isEnding ? result.endingText || "" : "",
+          turn: current.turn + 1,
+          snapshots: [...current.snapshots, snapshot].slice(-MAX_UNDO_SNAPSHOTS),
+        });
+        setNarration(narrationText);
       } else {
-        setError("AI 返回的下一场景无法解析，请重新选择该选项");
+        onAdventureChange(current);
+        setError(
+          accumulated
+            ? "AI 返回的下一场景无法解析，请重新选择该选项"
+            : "AI 服务未返回内容，请检查服务配置后重试"
+        );
       }
     } catch (err) {
       console.error("Action failed:", err);
+      onAdventureChange(current);
       const message = err instanceof Error ? err.message : "";
       setError(
         message && message !== "Failed to fetch"
@@ -264,26 +331,65 @@ export function GamePhase({
     }
   };
 
-  const currentScene = gameState?.currentScene;
+  const handleUndo = () => {
+    if (!adventure || adventure.snapshots.length === 0) return;
+    const snapshot = adventure.snapshots[adventure.snapshots.length - 1];
+    setNarration("");
+    setDisplayedText("");
+    setError("");
+    initKeyRef.current = "";
+    onAdventureChange({
+      ...adventure,
+      ...snapshot,
+      snapshots: adventure.snapshots.slice(0, -1),
+    });
+  };
+
+  const resetToSelect = () => {
+    initKeyRef.current = "";
+    setNarration("");
+    setDisplayedText("");
+    setError("");
+    onAdventureChange(null);
+  };
+
+  const liveIndex = narration ? history.length - 1 : -1;
+  const displayTitle = gameState?.title || project.novelName || "文字冒险";
 
   // ---- Character selection screen ----
-  if (!selectedCharacter) {
+  if (!character) {
     return (
       <div className="min-h-screen py-6 px-4">
         <div className="max-w-3xl mx-auto">
           <div className="flex items-center justify-between mb-8 animate-fade-in">
             <div className="flex items-center gap-3">
               <Wand2 className="w-6 h-6 text-amber" />
-              <h1 className="font-serif text-xl font-bold text-parchment">{"选择你的角色"}</h1>
+              <h1 className="font-serif text-xl font-bold text-parchment">选择你的角色</h1>
             </div>
-            <button
-              onClick={onRestart}
-              className="flex items-center gap-2 px-4 py-2 text-sm text-muted-foreground hover:text-parchment border border-border rounded-lg hover:border-amber/30 transition-all"
-            >
-              <RotateCcw className="w-4 h-4" />
-              {"重新开始"}
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={onExport}
+                className="flex items-center gap-2 px-4 py-2 text-sm text-muted-foreground hover:text-parchment border border-border rounded-lg hover:border-amber/30 transition-all"
+              >
+                <Download className="w-4 h-4" />
+                导出存档
+              </button>
+              <button
+                onClick={onRestart}
+                className="flex items-center gap-2 px-4 py-2 text-sm text-muted-foreground hover:text-parchment border border-border rounded-lg hover:border-amber/30 transition-all"
+              >
+                <RotateCcw className="w-4 h-4" />
+                重新开始
+              </button>
+            </div>
           </div>
+
+          <p className="mb-6 text-xs text-muted-foreground">
+            {project.repair && project.repair.appliedFixes.length > 0
+              ? `本次冒险使用已修补 ${project.repair.appliedFixes.length} 处漏洞后的设定。`
+              : ""}
+          </p>
 
           {/* Mode switcher */}
           <div className="flex gap-2 mb-8">
@@ -296,7 +402,7 @@ export function GamePhase({
               }`}
             >
               <User className="w-4 h-4" />
-              {"扮演故事角色"}
+              扮演故事角色
             </button>
             <button
               onClick={() => setMode("custom")}
@@ -307,21 +413,21 @@ export function GamePhase({
               }`}
             >
               <UserPlus className="w-4 h-4" />
-              {"自创角色"}
+              自创角色
             </button>
           </div>
 
           {mode === "existing" ? (
             <>
               <p className="text-xs text-muted-foreground mb-3">
-                {"从小说设定中挑选一位人物，以第一人称进入属于 TA 的故事"}
+                从小说设定中挑选一位人物，以第一人称进入属于 TA 的故事
               </p>
               {characters.length > 0 ? (
                 <div className="grid gap-4 md:grid-cols-2">
-                  {characters.map((character, idx) => (
+                  {characters.map((item, idx) => (
                     <button
                       key={idx}
-                      onClick={() => handleSelectCharacter(character)}
+                      onClick={() => handleSelectCharacter(item)}
                       className="text-left p-5 bg-card border border-border rounded-xl hover:border-amber/40 hover:bg-secondary/50 transition-all group"
                     >
                       <div className="flex items-start gap-3 mb-3">
@@ -330,41 +436,41 @@ export function GamePhase({
                         </div>
                         <div>
                           <p className="font-serif text-lg text-parchment group-hover:text-amber-light transition-colors">
-                            {character.name}
+                            {item.name}
                           </p>
-                          <p className="text-xs text-amber">{character.role || "关键人物"}</p>
+                          <p className="text-xs text-amber">{item.role || "关键人物"}</p>
                         </div>
                       </div>
-                      {character.abilities && (
+                      {item.abilities && (
                         <p className="text-xs text-muted-foreground mb-2">
-                          {"能力"}：{character.abilities}
+                          能力：{item.abilities}
                         </p>
                       )}
-                      {character.personality && (
+                      {item.personality && (
                         <p className="text-xs text-muted-foreground line-clamp-2">
-                          {character.personality}
+                          {item.personality}
                         </p>
                       )}
                       <span className="inline-flex items-center gap-1 mt-3 text-xs text-amber opacity-0 group-hover:opacity-100 transition-opacity">
-                        {"扮演 TA 进入故事"} <ChevronRight className="w-3 h-3" />
+                        扮演 TA 进入故事 <ChevronRight className="w-3 h-3" />
                       </span>
                     </button>
                   ))}
                 </div>
               ) : (
                 <div className="p-8 bg-card border border-border rounded-xl text-center text-muted-foreground">
-                  {"设定圣经中暂未提取到人物，可直接自创角色进入故事。"}
+                  设定圣经中暂未提取到人物，可直接自创角色进入故事。
                 </div>
               )}
             </>
           ) : (
             <div className="bg-card border border-border rounded-xl p-6 space-y-4">
               <p className="text-xs text-muted-foreground">
-                {"创造一位只属于你的角色，踏入小说世界的冒险"}
+                创造一位只属于你的角色，踏入小说世界的冒险
               </p>
               <div>
                 <label className="block text-sm text-parchment mb-1.5">
-                  {"角色名字"} <span className="text-crimson">*</span>
+                  角色名字 <span className="text-crimson">*</span>
                 </label>
                 <input
                   value={customName}
@@ -374,7 +480,7 @@ export function GamePhase({
                 />
               </div>
               <div>
-                <label className="block text-sm text-parchment mb-1.5">{"角色背景"}</label>
+                <label className="block text-sm text-parchment mb-1.5">角色背景</label>
                 <textarea
                   value={customBg}
                   onChange={(e) => setCustomBg(e.target.value)}
@@ -385,7 +491,7 @@ export function GamePhase({
               </div>
               <div className="grid md:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm text-parchment mb-1.5">{"能力 / 特长（可选）"}</label>
+                  <label className="block text-sm text-parchment mb-1.5">能力 / 特长（可选）</label>
                   <input
                     value={customAbilities}
                     onChange={(e) => setCustomAbilities(e.target.value)}
@@ -394,7 +500,7 @@ export function GamePhase({
                   />
                 </div>
                 <div>
-                  <label className="block text-sm text-parchment mb-1.5">{"性格（可选）"}</label>
+                  <label className="block text-sm text-parchment mb-1.5">性格（可选）</label>
                   <input
                     value={customPersonality}
                     onChange={(e) => setCustomPersonality(e.target.value)}
@@ -409,7 +515,7 @@ export function GamePhase({
                 className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-amber text-ink font-medium rounded-lg hover:bg-amber-light transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 <UserPlus className="w-4 h-4" />
-                {"以 TA 的身份开始冒险"}
+                以 TA 的身份开始冒险
               </button>
             </div>
           )}
@@ -423,23 +529,53 @@ export function GamePhase({
     <div className="min-h-screen py-6 px-4">
       <div className="max-w-3xl mx-auto">
         {/* Header */}
-        <div className="flex items-center justify-between mb-6 animate-fade-in">
+        <div className="flex flex-wrap items-center justify-between gap-3 mb-3 animate-fade-in">
           <div className="flex items-center gap-3">
             <Gamepad2 className="w-6 h-6 text-amber" />
             <div>
               <h1 className="font-serif text-xl font-bold text-parchment">
-                {gameState?.title || "文字冒险"}
+                {displayTitle}
               </h1>
-              <p className="text-xs text-amber">{"扮演"}：{selectedCharacter.name}</p>
+              <p className="text-xs text-amber">扮演：{character.name}</p>
             </div>
           </div>
-          <button
-            onClick={() => { setSelectedCharacter(null); setGameState(null); setHistory([]); setIsEnding(false); setNarration(""); setError(""); }}
-            className="flex items-center gap-2 px-4 py-2 text-sm text-muted-foreground hover:text-parchment border border-border rounded-lg hover:border-amber/30 transition-all"
-          >
-            <RotateCcw className="w-4 h-4" />
-            {"切换角色"}
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={handleUndo}
+              disabled={!canUndo}
+              title="回到上一次选择之前"
+              className="flex items-center gap-2 px-3 py-2 text-sm text-muted-foreground hover:text-parchment border border-border rounded-lg hover:border-amber/30 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              <Undo2 className="w-4 h-4" />
+              回退
+            </button>
+            <button
+              type="button"
+              onClick={onExport}
+              className="flex items-center gap-2 px-3 py-2 text-sm text-muted-foreground hover:text-parchment border border-border rounded-lg hover:border-amber/30 transition-all"
+            >
+              <Download className="w-4 h-4" />
+              导出
+            </button>
+            <button
+              type="button"
+              onClick={resetToSelect}
+              className="flex items-center gap-2 px-3 py-2 text-sm text-muted-foreground hover:text-parchment border border-border rounded-lg hover:border-amber/30 transition-all"
+            >
+              <RotateCcw className="w-4 h-4" />
+              切换角色
+            </button>
+          </div>
+        </div>
+
+        <div className="mb-6 flex items-center justify-between text-[11px] text-muted-foreground">
+          <span className={saveState === "error" ? "text-crimson" : ""}>
+            {SAVE_LABELS[saveState]}
+          </span>
+          <span>
+            第 {adventure?.turn ?? 0} 回合 · 可回退 {adventure?.snapshots.length ?? 0} 步
+          </span>
         </div>
 
         {/* Loading */}
@@ -447,10 +583,10 @@ export function GamePhase({
           <div className="flex flex-col items-center justify-center py-20">
             <Loader2 className="w-12 h-12 text-amber animate-spin mb-6" />
             <p className="text-parchment font-serif text-xl mb-2">
-              {"正在生成冒险世界..."}
+              正在生成冒险世界...
             </p>
             <p className="text-muted-foreground text-sm">
-              {"以 "}{selectedCharacter.name}{" 的身份，将设定圣经转化为可玩的文字冒险游戏"}
+              以 {character.name} 的身份，将设定圣经转化为可玩的文字冒险游戏
             </p>
           </div>
         )}
@@ -467,7 +603,7 @@ export function GamePhase({
               </Link>
               <button
                 type="button"
-                onClick={() => setSelectedCharacter(null)}
+                onClick={resetToSelect}
                 className="rounded-lg border border-border px-5 py-2.5 text-sm text-muted-foreground transition-colors hover:border-amber/30 hover:text-parchment"
               >
                 重新选择角色
@@ -501,12 +637,11 @@ export function GamePhase({
               ref={scrollRef}
               className="bg-card border border-border rounded-xl p-6 min-h-[400px] max-h-[60vh] overflow-y-auto mb-6"
             >
-              {/* History */}
               {history.map((entry, i) => (
                 <div key={i} className="mb-4">
                   {entry.type === "narration" ? (
                     <p className="game-text text-parchment leading-relaxed whitespace-pre-wrap">
-                      {i === history.length - 1 ? displayedText || entry.text : entry.text}
+                      {i === liveIndex ? displayedText || entry.text : entry.text}
                     </p>
                   ) : (
                     <div className="flex items-center gap-2 pl-4 border-l-2 border-amber/30 my-3">
@@ -517,11 +652,15 @@ export function GamePhase({
                 </div>
               ))}
 
+              {history.length === 0 && !isProcessing && (
+                <p className="text-sm text-muted-foreground">故事即将开始…</p>
+              )}
+
               {/* Processing indicator */}
               {isProcessing && (
                 <div className="flex items-center gap-2 text-muted-foreground">
                   <Loader2 className="w-4 h-4 animate-spin" />
-                  <span className="text-sm game-text">{"命运正在编织..."}</span>
+                  <span className="text-sm game-text">命运正在编织...</span>
                 </div>
               )}
             </div>
@@ -539,7 +678,7 @@ export function GamePhase({
             {isEnding && (
               <div className="text-center py-8 animate-fade-in">
                 <Skull className="w-16 h-16 text-amber mx-auto mb-4" />
-                <h2 className="font-serif text-2xl text-parchment mb-4">{"冒险结束"}</h2>
+                <h2 className="font-serif text-2xl text-parchment mb-4">冒险结束</h2>
                 {endingText && (
                   <p className="text-muted-foreground mb-8 max-w-md mx-auto leading-relaxed">{endingText}</p>
                 )}
@@ -557,12 +696,21 @@ export function GamePhase({
                     <span className="text-sm text-parchment">{stats.reputation}</span>
                   </div>
                 </div>
-                <button
-                  onClick={() => { setSelectedCharacter(null); setGameState(null); setHistory([]); setIsEnding(false); setNarration(""); setError(""); }}
-                  className="px-8 py-3 bg-amber text-ink font-medium rounded-lg hover:bg-amber-light transition-colors"
-                >
-                  {"换个角色再来一次"}
-                </button>
+                <div className="flex flex-wrap items-center justify-center gap-3">
+                  <button
+                    onClick={handleUndo}
+                    disabled={!canUndo}
+                    className="px-6 py-3 border border-border text-muted-foreground font-medium rounded-lg hover:border-amber/40 hover:text-parchment transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                  >
+                    回退一步
+                  </button>
+                  <button
+                    onClick={resetToSelect}
+                    className="px-8 py-3 bg-amber text-ink font-medium rounded-lg hover:bg-amber-light transition-colors"
+                  >
+                    换个角色再来一次
+                  </button>
+                </div>
               </div>
             )}
 
@@ -570,7 +718,7 @@ export function GamePhase({
             {!isEnding && currentScene && !isProcessing && (
               <div className="space-y-3">
                 <p className="text-xs text-muted-foreground mb-2">
-                  {"当前位置"}: {currentScene.location}
+                  当前位置: {currentScene.location}
                 </p>
                 {currentScene.choices.map((choice) => (
                   <button

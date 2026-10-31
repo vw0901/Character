@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -129,6 +130,20 @@ def ensure_static(rebuild: bool) -> None:
         build_static()
 
 
+def app_version() -> str:
+    """从 backend/app/version.py 读取版本号，避免多处硬编码。"""
+    version_file = BACKEND / "app" / "version.py"
+    try:
+        match = re.search(
+            r'^APP_VERSION\s*=\s*"([^"]+)"',
+            version_file.read_text(encoding="utf-8"),
+            re.MULTILINE,
+        )
+    except OSError:
+        return ""
+    return match.group(1) if match else ""
+
+
 def open_browser_later(url: str, host: str) -> None:
     if host not in {"127.0.0.1", "localhost", "0.0.0.0"}:
         return
@@ -166,10 +181,12 @@ def main() -> int:
     display_host = "127.0.0.1" if args.host == "0.0.0.0" else args.host
     url = f"http://{display_host}:{args.port}"
 
+    version = app_version()
     print()
     print("=" * 52)
-    print(f"  假如是你 已就绪：{url}")
+    print(f"  假如是你{' v' + version if version else ''} 已就绪：{url}")
     print("  第一次使用：点右上角齿轮，填 AI 地址和 Key")
+    print("  存档目录：backend/data/projects（每个项目一个 JSON）")
     print("  按 Ctrl+C 停止服务")
     print("=" * 52)
     print(flush=True)

@@ -52,6 +52,14 @@ logs/
 *.tmp
 *.temp
 .tmp/
+tmp-test-data/
+tmp-verify/
+tmp-pytest/
+.pytest-tmp/
+tmp-pycheck/
+
+# ===== 本地项目存档（运行时生成，每个项目一个 .json） =====
+backend/data/
 
 # ===== 测试与覆盖率 =====
 coverage/

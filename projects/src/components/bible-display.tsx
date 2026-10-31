@@ -1,50 +1,80 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import Link from "next/link";
 import {
   BookOpen, Globe, Swords, Users, Clock, HelpCircle,
   ChevronDown, ChevronUp, Loader2, Shield, ArrowRight,
+  Download, RotateCcw, CheckCircle2,
 } from "lucide-react";
 import { withAiConfig } from "@/lib/ai/browser";
 import { readSseText } from "@/lib/ai/sse";
-import type { SearchData, SettingBible } from "@/app/page";
+import {
+  normalizeBible,
+  parseJsonLoose,
+  type ProjectDocument,
+  type SaveState,
+  type SearchData,
+  type SettingBible,
+} from "@/lib/project";
 
 interface BibleDisplayProps {
-  searchData: SearchData;
-  bible: SettingBible | null;
+  project: ProjectDocument;
+  saveState: SaveState;
   onBibleComplete: (bible: SettingBible) => void;
   onStartCheck: () => void;
+  onExport: () => void;
+  onRestart: () => void;
 }
 
+const SAVE_LABELS: Record<SaveState, string> = {
+  idle: "未保存",
+  saving: "保存中…",
+  saved: "已保存到本机",
+  error: "保存失败",
+};
+
 export function BibleDisplay({
-  searchData,
-  bible,
+  project,
+  saveState,
   onBibleComplete,
   onStartCheck,
+  onExport,
+  onRestart,
 }: BibleDisplayProps) {
-  const [isGenerating, setIsGenerating] = useState(!bible);
+  const [isGenerating, setIsGenerating] = useState(!project.bible);
   const [rawText, setRawText] = useState("");
   const [error, setError] = useState("");
+  const [attempt, setAttempt] = useState(0);
   const [expandedSections, setExpandedSections] = useState<Set<string>>(
     new Set(["worldview", "powerSystem", "characters"])
   );
   const scrollRef = useRef<HTMLDivElement>(null);
+  const inFlight = useRef(false);
 
-  const parseBible = useCallback((text: string): SettingBible | null => {
-    try {
-      const cleaned = text.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
-      const json = JSON.parse(cleaned);
-      return json as SettingBible;
-    } catch {
-      return null;
-    }
-  }, []);
+  const searchData: SearchData = useMemo(
+    () =>
+      project.search ?? {
+        novelName: project.novelName,
+        summary: project.bible?.synopsis ?? "",
+        results: [],
+      },
+    [project.search, project.novelName, project.bible?.synopsis]
+  );
+
+  const parseBible = useCallback(
+    (value: string): SettingBible | null => {
+      const parsed = parseJsonLoose(value);
+      return parsed ? normalizeBible(parsed, searchData.novelName) : null;
+    },
+    [searchData.novelName]
+  );
 
   useEffect(() => {
-    if (bible) return;
+    if (project.bible || inFlight.current) return;
 
     const generateBible = async () => {
+      inFlight.current = true;
       setIsGenerating(true);
       setRawText("");
       setError("");
@@ -74,7 +104,7 @@ export function BibleDisplay({
         } else if (!accumulated) {
           setError("AI 服务未返回内容，请检查服务配置后重试");
         } else {
-          setError("AI 返回的设定圣经无法解析，请点击返回重试");
+          setError("AI 返回的设定圣经无法解析，请点击重试");
         }
       } catch (err) {
         console.error("Bible generation failed:", err);
@@ -85,14 +115,16 @@ export function BibleDisplay({
             : "生成设定圣经失败，请检查 AI 服务配置后重试"
         );
       } finally {
+        inFlight.current = false;
         setIsGenerating(false);
       }
     };
 
-    generateBible();
-  }, [bible, searchData, onBibleComplete, parseBible]);
+    void generateBible();
+  }, [project.bible, attempt, parseBible, onBibleComplete, searchData]);
 
-  const displayBible = bible || parseBible(rawText);
+  const displayBible = project.bible ?? parseBible(rawText);
+  const repairCount = project.repair?.appliedFixes.length ?? 0;
 
   const toggleSection = (section: string) => {
     setExpandedSections((prev) => {
@@ -116,33 +148,62 @@ export function BibleDisplay({
   };
 
   const sectionTitles: Record<string, string> = {
-    worldview: "\u4e16\u754c\u89c2",
-    powerSystem: "\u529b\u91cf\u4f53\u7cfb",
-    factions: "\u52bf\u529b\u9635\u8425",
-    characters: "\u6838\u5fc3\u4eba\u7269",
-    timeline: "\u65f6\u95f4\u7ebf",
-    mysteries: "\u672a\u89e3\u4e4b\u8c1c",
+    worldview: "世界观",
+    powerSystem: "力量体系",
+    factions: "势力阵营",
+    characters: "核心人物",
+    timeline: "时间线",
+    mysteries: "未解之谜",
   };
 
   return (
     <div className="min-h-screen py-8 px-4">
       <div className="max-w-4xl mx-auto">
+        {/* Toolbar */}
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3 text-xs text-muted-foreground">
+          <span
+            className={
+              saveState === "error" ? "text-crimson" : "text-muted-foreground"
+            }
+          >
+            {SAVE_LABELS[saveState]}
+          </span>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={onExport}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 transition-colors hover:border-amber/40 hover:text-parchment"
+            >
+              <Download className="w-3.5 h-3.5" />
+              导出 JSON
+            </button>
+            <button
+              type="button"
+              onClick={onRestart}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 transition-colors hover:border-amber/40 hover:text-parchment"
+            >
+              <RotateCcw className="w-3.5 h-3.5" />
+              重新开始
+            </button>
+          </div>
+        </div>
+
         {/* Header */}
         <div className="mb-8 animate-fade-in">
           <div className="flex items-center gap-3 mb-4">
             <BookOpen className="w-8 h-8 text-amber" />
             <h1 className="font-serif text-3xl font-bold text-parchment">
-              {"\u8bbe\u5b9a\u5723\u7ecf"}
+              设定圣经
             </h1>
           </div>
           <div className="flex items-center gap-4 text-sm text-muted-foreground">
             <span className="px-3 py-1 bg-secondary rounded-full border border-border">
-              {searchData.novelName}
+              {searchData.novelName || project.novelName}
             </span>
             {displayBible && (
               <>
                 <span>{displayBible.author}</span>
-                <span className={`px-2 py-0.5 rounded ${displayBible.status === "\u5b8c\u7ed3" ? "bg-forest/20 text-forest" : "bg-amber/20 text-amber"}`}>
+                <span className={`px-2 py-0.5 rounded ${displayBible.status === "完结" ? "bg-forest/20 text-forest" : "bg-amber/20 text-amber"}`}>
                   {displayBible.status}
                 </span>
                 <span>{displayBible.genre}</span>
@@ -154,6 +215,12 @@ export function BibleDisplay({
               {displayBible.synopsis}
             </p>
           )}
+          {repairCount > 0 && (
+            <p className="mt-3 inline-flex items-center gap-2 rounded-lg border border-forest/30 bg-forest/10 px-3 py-1.5 text-xs text-forest">
+              <CheckCircle2 className="w-4 h-4" />
+              已按体检报告修补 {repairCount} 处设定
+            </p>
+          )}
         </div>
 
         {/* Loading state */}
@@ -161,10 +228,10 @@ export function BibleDisplay({
           <div className="flex flex-col items-center justify-center py-20">
             <Loader2 className="w-12 h-12 text-amber animate-spin mb-6" />
             <p className="text-parchment font-serif text-xl mb-2">
-              {"\u6b63\u5728\u89e3\u6790\u5c0f\u8bf4\u8bbe\u5b9a..."}
+              正在解析小说设定...
             </p>
             <p className="text-muted-foreground text-sm">
-              {"\u4ece\u641c\u7d22\u7ed3\u679c\u4e2d\u63d0\u53d6\u4e16\u754c\u89c2\u3001\u4eba\u7269\u3001\u529b\u91cf\u4f53\u7cfb\u7b49\u7ed3\u6784\u5316\u4fe1\u606f"}
+              从搜索结果中提取世界观、人物、力量体系等结构化信息
             </p>
             {rawText && (
               <div
@@ -182,12 +249,21 @@ export function BibleDisplay({
         {error && !displayBible && !isGenerating && (
           <div className="flex flex-col items-center justify-center py-20 text-center">
             <p className="mb-4 max-w-xl text-sm text-crimson">{error}</p>
-            <Link
-              href="/settings/"
-              className="rounded-lg border border-amber/30 px-5 py-2.5 text-sm text-parchment transition-colors hover:border-amber/60"
-            >
-              前往 AI 设置
-            </Link>
+            <div className="flex flex-wrap justify-center gap-3">
+              <button
+                type="button"
+                onClick={() => setAttempt((value) => value + 1)}
+                className="rounded-lg border border-amber/30 px-5 py-2.5 text-sm text-parchment transition-colors hover:border-amber/60"
+              >
+                重试生成
+              </button>
+              <Link
+                href="/settings/"
+                className="rounded-lg border border-border px-5 py-2.5 text-sm text-muted-foreground transition-colors hover:border-amber/30 hover:text-parchment"
+              >
+                前往 AI 设置
+              </Link>
+            </div>
           </div>
         )}
 
@@ -202,10 +278,10 @@ export function BibleDisplay({
               onToggle={() => toggleSection("worldview")}
             >
               <div className="space-y-3">
-                <InfoBlock label={"\u4e16\u754c\u6982\u8ff0"} value={displayBible.worldview.summary} />
-                <InfoBlock label={"\u5730\u7406\u73af\u5883"} value={displayBible.worldview.geography} />
-                <InfoBlock label={"\u5386\u53f2\u80cc\u666f"} value={displayBible.worldview.history} />
-                <InfoBlock label={"\u8fd0\u884c\u89c4\u5219"} value={displayBible.worldview.rules} />
+                <InfoBlock label="世界概述" value={displayBible.worldview.summary} />
+                <InfoBlock label="地理环境" value={displayBible.worldview.geography} />
+                <InfoBlock label="历史背景" value={displayBible.worldview.history} />
+                <InfoBlock label="运行规则" value={displayBible.worldview.rules} />
               </div>
             </SectionCard>
 
@@ -217,11 +293,11 @@ export function BibleDisplay({
               onToggle={() => toggleSection("powerSystem")}
             >
               <div className="space-y-3">
-                <InfoBlock label={"\u4f53\u7cfb\u540d\u79f0"} value={displayBible.powerSystem.name} />
-                <InfoBlock label={"\u4f53\u7cfb\u8bf4\u660e"} value={displayBible.powerSystem.description} />
-                <InfoBlock label={"\u9650\u5236\u6761\u4ef6"} value={displayBible.powerSystem.limitations} />
+                <InfoBlock label="体系名称" value={displayBible.powerSystem.name} />
+                <InfoBlock label="体系说明" value={displayBible.powerSystem.description} />
+                <InfoBlock label="限制条件" value={displayBible.powerSystem.limitations} />
                 <div>
-                  <p className="text-sm text-muted-foreground mb-2">{"\u7b49\u7ea7\u4f53\u7cfb"}</p>
+                  <p className="text-sm text-muted-foreground mb-2">等级体系</p>
                   <div className="flex flex-wrap gap-2">
                     {displayBible.powerSystem.levels.map((level, i) => (
                       <span
@@ -248,10 +324,10 @@ export function BibleDisplay({
                   <div key={i} className="bg-secondary/50 border border-border rounded-lg p-4">
                     <h4 className="text-amber font-medium mb-2">{faction.name}</h4>
                     <p className="text-sm text-muted-foreground mb-2">{faction.description}</p>
-                    <p className="text-xs text-sage">{"\u76ee\u6807"}: {faction.goal}</p>
+                    <p className="text-xs text-sage">目标: {faction.goal}</p>
                     {faction.keyMembers.length > 0 && (
                       <p className="text-xs text-muted-foreground mt-1">
-                        {"\u6838\u5fc3\u6210\u5458"}: {faction.keyMembers.join("\u3001")}
+                        核心成员: {faction.keyMembers.join("、")}
                       </p>
                     )}
                   </div>
@@ -276,8 +352,8 @@ export function BibleDisplay({
                       </span>
                     </div>
                     <p className="text-sm text-muted-foreground mb-1">{char.personality}</p>
-                    <p className="text-xs text-sage">{"\u80fd\u529b"}: {char.abilities}</p>
-                    <p className="text-xs text-muted-foreground mt-1">{"\u5173\u7cfb"}: {char.relationships}</p>
+                    <p className="text-xs text-sage">能力: {char.abilities}</p>
+                    <p className="text-xs text-muted-foreground mt-1">关系: {char.relationships}</p>
                   </div>
                 ))}
               </div>
@@ -315,8 +391,8 @@ export function BibleDisplay({
                       <HelpCircle className="w-4 h-4" />
                       {mystery.question}
                     </h4>
-                    <p className="text-xs text-sage mb-1">{"\u7ebf\u7d22"}: {mystery.clues}</p>
-                    <p className="text-xs text-muted-foreground">{"\u731c\u6d4b"}: {mystery.theories}</p>
+                    <p className="text-xs text-sage mb-1">线索: {mystery.clues}</p>
+                    <p className="text-xs text-muted-foreground">猜测: {mystery.theories}</p>
                   </div>
                 ))}
               </div>
@@ -329,7 +405,7 @@ export function BibleDisplay({
                 className="group flex items-center gap-3 px-8 py-4 bg-card border border-amber/30 rounded-xl text-parchment hover:border-amber/60 hover:glow-amber transition-all"
               >
                 <Shield className="w-5 h-5 text-amber" />
-                <span className="font-serif text-lg">{"\u5f00\u59cb\u6f0f\u6d1e\u4f53\u68c0"}</span>
+                <span className="font-serif text-lg">开始漏洞体检</span>
                 <ArrowRight className="w-5 h-5 text-amber group-hover:translate-x-1 transition-transform" />
               </button>
             </div>
@@ -373,6 +449,7 @@ function SectionCard({
 }
 
 function InfoBlock({ label, value }: { label: string; value: string }) {
+  if (!value) return null;
   return (
     <div>
       <p className="text-xs text-muted-foreground mb-0.5">{label}</p>

@@ -60,6 +60,18 @@ CHECK = {
     "strengths": ["人物动机清晰"],
 }
 
+REPAIR = {
+    "summary": "已按体检报告补全世界观与力量体系。",
+    "appliedFixes": [
+        {
+            "issue": "测试漏洞",
+            "action": "补充了世界观限制条件",
+            "field": "worldview",
+        }
+    ],
+    "bible": BIBLE,
+}
+
 GAME = {
     "title": "测试冒险",
     "intro": "你睁开眼，雨落在青石板上。",
@@ -106,6 +118,8 @@ def _system_prompt(messages: list[dict[str, Any]]) -> str:
 
 
 def _response_text(system_prompt: str, user_prompt: str) -> str:
+    if "小说设定修补师" in system_prompt:
+        return json.dumps(REPAIR, ensure_ascii=False, separators=(",", ":"))
     if "小说设定审计师" in system_prompt:
         return json.dumps(CHECK, ensure_ascii=False, separators=(",", ":"))
     if "文字冒险游戏大师" in system_prompt and "刚刚做出了一个选择" in system_prompt:
