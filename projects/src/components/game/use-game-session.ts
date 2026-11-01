@@ -35,6 +35,9 @@ interface UseGameSessionParams {
 /** 判定请求要等模型把整轮剧情写完才能发出，超时后交给本地兜底。 */
 const GOAL_CHECK_TIMEOUT_MS = 20_000;
 
+/** 后日谈是整段故事的收尾，篇幅更长，给足时间但不要无限等待。 */
+const EPILOGUE_TIMEOUT_MS = 120_000;
+
 interface GoalCheckParams {
   goal: StoryGoal;
   narration: string;
@@ -92,6 +95,10 @@ export function useGameSession({
   const [isInitializing, setIsInitializing] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [isVerifyingGoal, setIsVerifyingGoal] = useState(false);
+  const [isWritingEpilogue, setIsWritingEpilogue] = useState(false);
+  const [epilogueError, setEpilogueError] = useState("");
+  // 后日谈边写边显示；写完整了才写进故事书，避免半截文字被存档。
+  const [epilogueDraft, setEpilogueDraft] = useState("");
   const [narration, setNarration] = useState("");
   const [displayedText, setDisplayedText] = useState("");
   const [error, setError] = useState("");
@@ -102,6 +109,13 @@ export function useGameSession({
   const loadCheckKeyRef = useRef("");
   // 同一时刻只允许一个行动请求；state 更新有延迟，用它挡住连点。
   const processingRef = useRef(false);
+  // 后日谈：同一局结局只自动写一次，失败后由玩家手动重试。
+  const epilogueKeyRef = useRef("");
+  const epilogueRequestRef = useRef(0);
+  const epilogueAbortRef = useRef<AbortController | null>(null);
+  // 后日谈请求回来时，这本故事书可能已经被重开或替换：用来核对还是不是同一局。
+  const adventureRef = useRef<AdventureState | null>(adventure);
+  adventureRef.current = adventure;
 
   const characters = bible.characters || [];
   const character = adventure?.character ?? null;
@@ -115,14 +129,30 @@ export function useGameSession({
 
   // 切换故事书时清掉上一本留下的临时状态（必须在开场 effect 之前）。
   useEffect(() => {
+    epilogueRequestRef.current += 1;
+    epilogueAbortRef.current?.abort();
+    epilogueAbortRef.current = null;
+    epilogueKeyRef.current = "";
     setNarration("");
     setDisplayedText("");
     setError("");
+    setEpilogueError("");
+    setEpilogueDraft("");
     setIsProcessing(false);
     setIsInitializing(false);
     setIsVerifyingGoal(false);
+    setIsWritingEpilogue(false);
     initKeyRef.current = "";
   }, [adventure?.character.name, adventure?.startedAt]);
+
+  // 离开冒险界面时别让后日谈的流继续跑着。
+  useEffect(
+    () => () => {
+      epilogueRequestRef.current += 1;
+      epilogueAbortRef.current?.abort();
+    },
+    []
+  );
 
   // 选好角色但没有初始场景时，生成开场。
   useEffect(() => {
@@ -283,6 +313,105 @@ export function useGameSession({
     [onAdventureChange]
   );
 
+  /**
+   * 为已经结束的故事写后日谈。
+   * 先流式写在结局面板上，收完整了才写进故事书，避免半截文字被存档。
+   */
+  const writeEpilogue = useCallback(
+    async (source: AdventureState, force = false) => {
+      if (source.outcome === "playing" || !source.gameState) return;
+      if (!source.goal.title.trim()) return;
+
+      const key = `${source.character.name}:${source.startedAt}:${source.turn}`;
+      if (!force && epilogueKeyRef.current === key) return;
+      epilogueKeyRef.current = key;
+
+      epilogueAbortRef.current?.abort();
+      const controller = new AbortController();
+      epilogueAbortRef.current = controller;
+      const requestId = epilogueRequestRef.current + 1;
+      epilogueRequestRef.current = requestId;
+      const timer = window.setTimeout(() => controller.abort(), EPILOGUE_TIMEOUT_MS);
+
+      setIsWritingEpilogue(true);
+      setEpilogueError("");
+      setEpilogueDraft("");
+
+      let accumulated = "";
+      try {
+        const res = await fetch("/api/game/epilogue", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          signal: controller.signal,
+          body: JSON.stringify(
+            withAiConfig({
+              bible,
+              characterChoice: source.character,
+              goal: source.goal,
+              timeline: source.timeline,
+              outcome: source.outcome,
+              outcomeReason: source.outcomeReason,
+              endingText: source.endingText,
+              stats: source.stats,
+              history: source.history.map(({ type, text }) => ({ type, text })),
+            })
+          ),
+        });
+
+        for await (const chunk of readSseText(res)) {
+          if (epilogueRequestRef.current !== requestId) return;
+          accumulated += chunk;
+          setEpilogueDraft(accumulated);
+        }
+
+        const epilogue = accumulated.trim();
+        if (!epilogue) throw new Error("AI 未返回后日谈内容，请重试");
+        if (epilogueRequestRef.current !== requestId) return;
+
+        // 期间重开或回退了这一局：这份后日谈已经不属于当前故事书了。
+        const currentBook = adventureRef.current;
+        if (
+          !currentBook ||
+          currentBook.startedAt !== source.startedAt ||
+          currentBook.turn !== source.turn ||
+          currentBook.outcome !== source.outcome
+        ) {
+          return;
+        }
+
+        onAdventureChange({ ...source, epilogue });
+        setEpilogueDraft("");
+      } catch (err) {
+        if (epilogueRequestRef.current !== requestId) return;
+        console.warn("Epilogue failed:", err);
+        setEpilogueError(
+          controller.signal.aborted
+            ? "书写后日谈超时，可以再试一次"
+            : errorMessage(err, "书写后日谈失败，请检查 AI 服务配置后重试")
+        );
+      } finally {
+        window.clearTimeout(timer);
+        if (epilogueRequestRef.current === requestId) {
+          setIsWritingEpilogue(false);
+        }
+      }
+    },
+    [bible, onAdventureChange]
+  );
+
+  // 故事一结束就自动写后日谈；失败或超时不自动重试，把决定权交给玩家。
+  useEffect(() => {
+    if (!adventure?.gameState) return;
+    if (adventure.outcome === "playing" || adventure.turn === 0) return;
+    if (adventure.epilogue) return;
+    void writeEpilogue(adventure);
+  }, [adventure, writeEpilogue]);
+
+  const handleWriteEpilogue = useCallback(() => {
+    if (!adventure) return;
+    void writeEpilogue(adventure, true);
+  }, [adventure, writeEpilogue]);
+
   const handleChoice = async (choiceId: string, choiceText: string) => {
     if (processingRef.current || isProcessing) return;
 
@@ -424,6 +553,14 @@ export function useGameSession({
   const handleUndo = () => {
     if (!adventure || adventure.snapshots.length === 0) return;
     const snapshot = adventure.snapshots[adventure.snapshots.length - 1];
+    // 回到结局之前的回合：上一版后日谈已经不作数了。
+    epilogueRequestRef.current += 1;
+    epilogueAbortRef.current?.abort();
+    epilogueAbortRef.current = null;
+    epilogueKeyRef.current = "";
+    setEpilogueDraft("");
+    setEpilogueError("");
+    setIsWritingEpilogue(false);
     setNarration("");
     setDisplayedText("");
     setError("");
@@ -431,6 +568,7 @@ export function useGameSession({
     onAdventureChange({
       ...adventure,
       ...snapshot,
+      epilogue: "",
       snapshots: adventure.snapshots.slice(0, -1),
     });
   };
@@ -451,6 +589,10 @@ export function useGameSession({
     history,
     isEnding,
     endingText,
+    epilogue: adventure?.epilogue ?? "",
+    epilogueDraft,
+    isWritingEpilogue,
+    epilogueError,
     currentScene,
     canUndo,
     isInitializing,
@@ -462,6 +604,7 @@ export function useGameSession({
     startAdventure,
     handleChoice,
     handleUndo,
+    handleWriteEpilogue,
     resetToSelect,
   };
 }

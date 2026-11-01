@@ -1,6 +1,6 @@
 export const PROJECT_FORMAT = "if-it-were-you/project";
 export const PROJECT_FORMAT_VERSION = 2;
-export const APP_VERSION = "0.3.1";
+export const APP_VERSION = "0.3.2";
 export const MAX_UNDO_SNAPSHOTS = 20;
 
 export interface SearchResult {
@@ -189,6 +189,8 @@ export interface AdventureState {
   timeline: StoryTimeline;
   outcome: AdventureOutcome;
   outcomeReason: string;
+  /** 结局之后的后日谈；失败与成功都会写，写完随故事书一起存档。 */
+  epilogue: string;
 }
 
 export interface ProjectDocument {

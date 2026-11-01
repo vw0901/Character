@@ -54,6 +54,10 @@ export function GamePhase({
     stats,
     history,
     endingText,
+    epilogue,
+    epilogueDraft,
+    isWritingEpilogue,
+    epilogueError,
     currentScene,
     canUndo,
     isInitializing,
@@ -65,6 +69,7 @@ export function GamePhase({
     startAdventure,
     handleChoice,
     handleUndo,
+    handleWriteEpilogue,
     resetToSelect,
   } = useGameSession({
     bible,
@@ -191,9 +196,14 @@ export function GamePhase({
                 outcome={adventure.outcome === "success" ? "success" : "failure"}
                 reason={adventure.outcomeReason}
                 endingText={endingText}
+                epilogue={epilogue}
+                epilogueDraft={epilogueDraft}
+                isWritingEpilogue={isWritingEpilogue}
+                epilogueError={epilogueError}
                 stats={stats}
                 canUndo={canUndo}
                 onUndo={handleUndo}
+                onWriteEpilogue={handleWriteEpilogue}
                 onRestartBook={onRestartBook}
                 onLeave={resetToSelect}
               />

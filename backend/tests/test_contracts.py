@@ -250,6 +250,58 @@ def test_game_goal_check_requires_content(client: TestClient) -> None:
     assert response.json()["error"]
 
 
+def test_game_epilogue_sse_contract(client: TestClient) -> None:
+    response = client.post(
+        "/api/game/epilogue",
+        json={
+            "bible": BIBLE,
+            "characterChoice": CHARACTER,
+            "goal": {"title": "找到妹妹", "description": "在血月前带她离开古桥"},
+            "timeline": {"label": "血月降临前", "totalDays": 20, "currentDay": 18},
+            "outcome": "success",
+            "outcomeReason": "达成最终目标：找到妹妹",
+            "endingText": "你们在血月升起前离开了古桥。",
+            "history": [
+                {"type": "choice", "text": "过桥"},
+                {"type": "narration", "text": "你终于在桥下找到了妹妹。"},
+            ],
+        },
+    )
+    assert response.status_code == 200
+    assert response.headers["content-type"].startswith("text/event-stream")
+    assert response.headers["cache-control"] == "no-cache, no-transform"
+    assert response.text.rstrip().endswith("data: [DONE]")
+    text = sse_text(response)
+    assert "雨停之后" in text
+    assert "妹妹" in text
+
+
+def test_game_epilogue_writes_failure_ending(client: TestClient) -> None:
+    response = client.post(
+        "/api/game/epilogue",
+        json={
+            "bible": BIBLE,
+            "goal": {"title": "找到妹妹"},
+            "outcome": "failure",
+            "outcomeReason": "时间线耗尽（第 21 天 / 共 20 天），未能达成最终目标",
+        },
+    )
+    assert response.status_code == 200
+    assert sse_text(response).strip()
+
+
+def test_game_epilogue_requires_finished_story(client: TestClient) -> None:
+    not_finished = client.post(
+        "/api/game/epilogue",
+        json={"goal": {"title": "找到妹妹"}, "outcome": "playing"},
+    )
+    assert not_finished.status_code == 400
+    assert not_finished.json()["error"]
+
+    no_goal = client.post("/api/game/epilogue", json={"outcome": "success"})
+    assert no_goal.status_code == 400
+
+
 def test_stream_falls_back_to_non_streaming(
     client: TestClient, mock_server: str
 ) -> None:

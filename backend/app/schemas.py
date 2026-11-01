@@ -77,6 +77,18 @@ class GameGoalCheckRequest(APIModel):
     ai_config: AiConfig | None = Field(default=None, alias="aiConfig")
 
 
+class GameEpilogueRequest(APIModel):
+    bible: dict[str, Any] = Field(default_factory=dict)
+    character_choice: CharacterChoice | None = Field(default=None, alias="characterChoice")
+    goal: dict[str, Any]
+    timeline: dict[str, Any] | None = None
+    outcome: str
+    outcome_reason: str = Field(default="", alias="outcomeReason")
+    ending_text: str = Field(default="", alias="endingText")
+    history: list[dict[str, Any]] = Field(default_factory=list)
+    ai_config: AiConfig | None = Field(default=None, alias="aiConfig")
+
+
 class RepairRequest(APIModel):
     bible: dict[str, Any]
     check: dict[str, Any] | None = None

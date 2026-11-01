@@ -121,6 +121,12 @@ ACTION = {
     "endingText": "",
 }
 
+EPILOGUE = (
+    "雨停之后，古桥的名字被写进了县志，却没有写你的名字。\n\n"
+    "妹妹在第二年春天嫁了人，婚宴上没人提起血月，只有你在敬酒时看见桥的方向亮了一下。\n\n"
+    "你仍旧走夜路，仍旧在听见脚步声时把手按在剑柄上。有些结局不会随着故事结束，它只是换了一种方式继续。"
+)
+
 
 def _system_prompt(messages: list[dict[str, Any]]) -> str:
     for message in messages:
@@ -130,6 +136,8 @@ def _system_prompt(messages: list[dict[str, Any]]) -> str:
 
 
 def _response_text(system_prompt: str, user_prompt: str) -> str:
+    if "后日谈" in system_prompt:
+        return EPILOGUE
     if "剧情审校员" in system_prompt:
         achieved = "成功" in user_prompt
         return json.dumps(

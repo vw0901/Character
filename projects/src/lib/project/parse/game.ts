@@ -334,6 +334,7 @@ export function normalizeAdventure(value: unknown): AdventureState | null {
     timeline: normalizeStoryTimeline(record.timeline),
     outcome: normalizeOutcome(record.outcome, isEnding),
     outcomeReason: text(record.outcomeReason ?? record.outcome_reason),
+    epilogue: text(record.epilogue),
   };
 
   // 旧存档或手工改过的存档可能还标着「进行中」，但按规则已经该判负。

@@ -40,6 +40,7 @@ export function createAdventure(character: CharacterChoice): AdventureState {
     timeline: { ...DEFAULT_TIMELINE },
     outcome: "playing",
     outcomeReason: "",
+    epilogue: "",
   };
 }
 

@@ -4,6 +4,7 @@ from typing import Any
 
 from app.ai.prompts.bible import build_messages as build_bible_messages
 from app.ai.prompts.check import build_messages as build_check_messages
+from app.ai.prompts.epilogue import build_messages as build_epilogue_messages
 from app.ai.prompts.game import build_messages as build_game_messages
 from app.ai.prompts.game_action import build_messages as build_action_messages
 from app.ai.prompts.goal_check import build_messages as build_goal_check_messages
@@ -99,3 +100,30 @@ def test_goal_check_prompt_carries_goal_and_round() -> None:
     assert "你终于找到妹妹" in user_content
     assert "玩家选择：过桥" in user_content
     assert "血月刚刚升起" in user_content
+
+
+def test_epilogue_prompt_carries_goal_and_ending() -> None:
+    messages = build_epilogue_messages(
+        {"novelName": "测试小说"},
+        {"name": "林澈", "background": "游侠", "abilities": "剑术"},
+        {"title": "找到妹妹", "description": "在血月前带她离开古桥"},
+        {"label": "血月降临前", "totalDays": 20, "currentDay": 20},
+        "failure",
+        "时间线耗尽（第 21 天 / 共 20 天），未能达成最终目标",
+        "血月升起来了。",
+        [
+            {"type": "choice", "text": "过桥"},
+            {"type": "narration", "text": "桥心站着戴斗笠的人。"},
+        ],
+    )
+
+    assert "后日谈" in messages[0].content
+    user_content = messages[1].content
+    assert "测试小说" in user_content
+    assert "林澈" in user_content
+    assert "找到妹妹" in user_content
+    assert "在血月前带她离开古桥" in user_content
+    assert "第 20 / 20 天" in user_content
+    assert "失败" in user_content
+    assert "血月升起来了" in user_content
+    assert "玩家选择：过桥" in user_content

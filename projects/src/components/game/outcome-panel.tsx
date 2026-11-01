@@ -1,28 +1,69 @@
-import { BookOpen, Heart, RotateCcw, Skull, Star, Trophy, Undo2, Users, Zap } from "lucide-react";
+import {
+  BookOpen,
+  Feather,
+  Heart,
+  Loader2,
+  RotateCcw,
+  Skull,
+  Star,
+  Trophy,
+  Undo2,
+  Users,
+  Zap,
+} from "lucide-react";
 import type { AdventureOutcome, StatValues } from "@/lib/project";
 
 interface OutcomePanelProps {
   outcome: Exclude<AdventureOutcome, "playing">;
   reason: string;
   endingText: string;
+  epilogue: string;
+  epilogueDraft: string;
+  isWritingEpilogue: boolean;
+  epilogueError: string;
   stats: StatValues;
   canUndo: boolean;
   onUndo: () => void;
+  onWriteEpilogue: () => void;
   onRestartBook: () => void;
   onLeave: () => void;
+}
+
+/** 后日谈按空行分段，读起来像小说的收尾，而不是一整块文字。 */
+function epilogueParagraphs(text: string): string[] {
+  const blocks = text
+    .split(/\n{2,}/)
+    .map((block) => block.trim())
+    .filter(Boolean);
+  // 模型只给单换行时再按行拆开，避免整篇挤成一段。
+  if (blocks.length <= 1) {
+    return (blocks[0] ?? "")
+      .split(/\n+/)
+      .map((line) => line.trim())
+      .filter(Boolean);
+  }
+  return blocks;
 }
 
 export function OutcomePanel({
   outcome,
   reason,
   endingText,
+  epilogue,
+  epilogueDraft,
+  isWritingEpilogue,
+  epilogueError,
   stats,
   canUndo,
   onUndo,
+  onWriteEpilogue,
   onRestartBook,
   onLeave,
 }: OutcomePanelProps) {
   const success = outcome === "success";
+  // 重写时先藏起上一版，等新的文字流出来再显示，避免两版混在一起。
+  const epilogueText = isWritingEpilogue ? epilogueDraft : epilogue;
+  const paragraphs = epilogueParagraphs(epilogueText);
 
   return (
     <div className="text-center py-8 animate-fade-in">
@@ -40,6 +81,50 @@ export function OutcomePanel({
       {endingText && (
         <p className="text-muted-foreground mb-8 max-w-md mx-auto leading-relaxed">{endingText}</p>
       )}
+
+      <section className="mx-auto mb-8 max-w-xl rounded-xl border border-border bg-card/60 px-6 py-5 text-left">
+        <header className="mb-3 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2 text-amber">
+            <Feather className="w-4 h-4" />
+            <h3 className="font-serif text-sm tracking-wide">后日谈 · 大结局</h3>
+          </div>
+          {(epilogue || epilogueError) && !isWritingEpilogue && (
+            <button
+              type="button"
+              onClick={onWriteEpilogue}
+              className="text-xs text-muted-foreground transition-colors hover:text-amber"
+            >
+              {epilogue ? "重新书写" : "再试一次"}
+            </button>
+          )}
+        </header>
+
+        {paragraphs.length > 0 && (
+          <div className="game-text text-parchment leading-relaxed">
+            {paragraphs.map((paragraph, index) => (
+              <p key={index} className="mb-3 last:mb-0">
+                {paragraph}
+              </p>
+            ))}
+            {isWritingEpilogue && (
+              <span aria-hidden="true" className="inline-block text-amber animate-pulse">
+                ▍
+              </span>
+            )}
+          </div>
+        )}
+
+        {!isWritingEpilogue && epilogueError && (
+          <p className="text-sm text-crimson">{epilogueError}</p>
+        )}
+
+        {!epilogueError && paragraphs.length === 0 && (
+          <div className="flex items-center gap-2 text-muted-foreground">
+            <Loader2 className="w-4 h-4 animate-spin" />
+            <span className="game-text text-sm">正在为这段故事写下后日谈...</span>
+          </div>
+        )}
+      </section>
 
       {success && (
         <p className="text-sm text-muted-foreground mb-6 max-w-md mx-auto leading-relaxed">
