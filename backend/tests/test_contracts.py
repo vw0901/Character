@@ -198,6 +198,7 @@ def test_game_action_sse_contract(client: TestClient) -> None:
             "gameState": GAME_STATE,
             "choiceId": "choice_1",
             "choiceText": "过桥",
+            "history": [{"type": "narration", "text": "雨夜里你来到桥边。"}],
             "characterChoice": CHARACTER,
         },
     )

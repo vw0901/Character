@@ -23,12 +23,15 @@ async def game_action(body: GameActionRequest, request: Request):
         body.choice_id,
         body.choice_text,
         body.character_choice,
+        body.history,
     )
 
     async def generate():
         try:
             config = resolve_ai_config(body.ai_config)
-            async for text in stream_chat(config, messages, temperature=0.9):
+            async for text in stream_chat(
+                config, messages, temperature=0.9, max_tokens=1600
+            ):
                 if await request.is_disconnected():
                     return
                 yield sse_data(text)

@@ -1,6 +1,6 @@
 {
   "name": "if-it-were-you",
-  "version": "0.3.2",
+  "version": "0.3.3",
   "private": true,
   "description": "假如是你 —— 输入小说名，生成设定圣经，再走进故事的文字冒险。",
   "scripts": {

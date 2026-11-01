@@ -67,6 +67,7 @@ async def _summarize_results(
         config,
         build_summary_messages(query, results),
         temperature=0.3,
+        max_tokens=800,
     )
 
 
@@ -75,6 +76,7 @@ async def _model_fallback_summary(config: ResolvedAiConfig, novel_name: str) -> 
         config,
         build_fallback_messages(novel_name),
         temperature=0.3,
+        max_tokens=800,
     )
     return parse_fallback_summary(reply)
 

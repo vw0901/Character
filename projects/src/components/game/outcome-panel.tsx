@@ -1,5 +1,4 @@
 import {
-  BookOpen,
   Feather,
   Heart,
   Loader2,
@@ -128,7 +127,7 @@ export function OutcomePanel({
 
       {success && (
         <p className="text-sm text-muted-foreground mb-6 max-w-md mx-auto leading-relaxed">
-          这段故事已经完结。你可以接着开启同一角色的下一段故事，或去书架选择其他故事和人物。
+          这段故事已经完结。想再体验一次，请回到书架选择其他角色。
         </p>
       )}
 
@@ -148,31 +147,24 @@ export function OutcomePanel({
       </div>
 
       <div className="flex flex-wrap items-center justify-center gap-3">
-        <button
-          onClick={onUndo}
-          disabled={!canUndo}
-          className="inline-flex items-center gap-2 px-6 py-3 border border-border text-muted-foreground font-medium rounded-lg hover:border-amber/40 hover:text-parchment transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-        >
-          <Undo2 className="w-4 h-4" />
-          回退一步
-        </button>
+        {!success && (
+          <button
+            onClick={onUndo}
+            disabled={!canUndo}
+            className="inline-flex items-center gap-2 px-6 py-3 border border-border text-muted-foreground font-medium rounded-lg hover:border-amber/40 hover:text-parchment transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            <Undo2 className="w-4 h-4" />
+            回退一步
+          </button>
+        )}
         {success ? (
-          <>
-            <button
-              onClick={onRestartBook}
-              className="inline-flex items-center gap-2 px-8 py-3 bg-amber text-ink font-medium rounded-lg hover:bg-amber-light transition-colors"
-            >
-              <BookOpen className="w-4 h-4" />
-              进入下一段故事
-            </button>
-            <button
-              onClick={onLeave}
-              className="inline-flex items-center gap-2 px-6 py-3 border border-border text-muted-foreground font-medium rounded-lg hover:border-amber/40 hover:text-parchment transition-colors"
-            >
-              <Users className="w-4 h-4" />
-              选择其他故事或人物
-            </button>
-          </>
+          <button
+            onClick={onLeave}
+            className="inline-flex items-center gap-2 px-8 py-3 bg-amber text-ink font-medium rounded-lg hover:bg-amber-light transition-colors"
+          >
+            <Users className="w-4 h-4" />
+            选择其他角色
+          </button>
         ) : (
           <>
             <button

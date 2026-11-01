@@ -449,6 +449,7 @@ export function useGameSession({
             choiceId,
             choiceText,
             characterChoice: current.character,
+            history: current.history.slice(-10).map(({ type, text }) => ({ type, text })),
           })
         ),
       });

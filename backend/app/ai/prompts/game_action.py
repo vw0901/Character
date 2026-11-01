@@ -1,6 +1,6 @@
-import json
 from typing import Any
 
+from app.ai.prompts.context import bible_digest, dumps, format_history
 from app.schemas import CharacterChoice, ChatMessage
 
 
@@ -46,8 +46,8 @@ SYSTEM_PROMPT = """你是一位文字冒险游戏大师。玩家刚刚做出了�
 }
 
 要求：
-1. 叙述要紧承玩家的选择，只写这次选择带来的结果与变化，不要把新场景的环境描写提前复述一遍
-2. 新场景要有新的发现和挑战；选项不要与上一场景重复
+1. 叙述要紧承「最近剧情」与玩家这次的选择，只写这次选择带来的结果与变化；不要复述已经发生过的事件，也不要把新场景的环境描写提前复述一遍
+2. 新场景要有新的发现和挑战；选项不要与上一场景重复，也不要把玩家刚做过的选择原样再给一次
 3. 每次给出 2-4 个玩家此刻立刻能执行的新选项，绝不能没有选项
 4. statsChange 是本次行动对生命/战力/声望的加减，三项都写整数，没有变化写 0
 5. 叙述与数值必须一致：轻微擦伤 -5~-10，重伤 -25~-40，休息治疗 +10~+20；不要「只是擦破皮」却扣掉 30 点生命
@@ -65,6 +65,7 @@ def build_messages(
     choice_id: str,
     choice_text: str,
     character_choice: CharacterChoice | dict | None,
+    history: list[dict[str, Any]] | None = None,
 ) -> list[ChatMessage]:
     choice = (
         character_choice
@@ -105,14 +106,20 @@ def build_messages(
                 f"\n\n时间线：{label}，当前第 {int(current)} / {int(total)} 天，剩余 {remaining} 天。"
             )
 
-    bible_json = json.dumps(bible, ensure_ascii=False, separators=(",", ":"))
-    game_state_json = json.dumps(game_state, ensure_ascii=False, separators=(",", ":"))
-    user_content = (
-        f"设定圣经: {bible_json}\n\n"
-        f"当前游戏状态: {game_state_json}\n\n"
-        f"玩家选择了: {choice_text} (ID: {choice_id})\n"
-        f"{character_context}{goal_context}{timeline_context}\n\n请生成下一个场景。"
+    bible_json = dumps(bible_digest(bible))
+    game_state_json = dumps(game_state)
+    sections = [f"设定摘要: {bible_json}"]
+
+    recent = format_history(history, limit=8, text_limit=300)
+    if recent:
+        sections.append(f"最近剧情（从早到晚）:\n{recent}")
+
+    sections.append(f"当前游戏状态: {game_state_json}")
+    sections.append(
+        f"玩家选择了: {choice_text} (ID: {choice_id}){character_context}{goal_context}{timeline_context}"
     )
+
+    user_content = "\n\n".join(sections) + "\n\n请生成下一个场景。"
     return [
         ChatMessage(role="system", content=SYSTEM_PROMPT),
         ChatMessage(role="user", content=user_content),

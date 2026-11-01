@@ -1,6 +1,6 @@
 export const PROJECT_FORMAT = "if-it-were-you/project";
 export const PROJECT_FORMAT_VERSION = 2;
-export const APP_VERSION = "0.3.2";
+export const APP_VERSION = "0.3.3";
 export const MAX_UNDO_SNAPSHOTS = 20;
 
 export interface SearchResult {

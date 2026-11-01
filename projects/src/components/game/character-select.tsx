@@ -199,7 +199,11 @@ export function CharacterSelect({
                       )}
 
                       <span className="inline-flex items-center gap-1 mt-3 text-xs text-amber opacity-0 group-hover:opacity-100 transition-opacity">
-                        {book ? "继续这本故事书" : "开始新的故事书"}
+                        {book
+                          ? book.outcome === "playing"
+                            ? "继续这本故事书"
+                            : "回看已完结的故事"
+                          : "开始新的故事书"}
                         <ChevronRight className="w-3 h-3" />
                       </span>
                     </button>

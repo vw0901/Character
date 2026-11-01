@@ -22,7 +22,9 @@ async def repair(body: RepairRequest, request: Request):
     async def generate():
         try:
             config = resolve_ai_config(body.ai_config)
-            async for text in stream_chat(config, messages, temperature=0.4):
+            async for text in stream_chat(
+                config, messages, temperature=0.4, max_tokens=4096
+            ):
                 if await request.is_disconnected():
                     return
                 yield sse_data(text)

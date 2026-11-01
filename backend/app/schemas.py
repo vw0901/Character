@@ -65,6 +65,7 @@ class GameActionRequest(APIModel):
     game_state: dict[str, Any] = Field(alias="gameState")
     choice_id: str = Field(alias="choiceId")
     choice_text: str = Field(default="", alias="choiceText")
+    history: list[dict[str, Any]] = Field(default_factory=list)
     character_choice: CharacterChoice | None = Field(default=None, alias="characterChoice")
     ai_config: AiConfig | None = Field(default=None, alias="aiConfig")
 

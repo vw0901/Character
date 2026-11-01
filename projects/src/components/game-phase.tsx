@@ -95,6 +95,8 @@ export function GamePhase({
   const liveIndex = narration ? history.length - 1 : -1;
   const displayTitle = gameState?.title || project.novelName || "文字冒险";
   const ended = adventure.outcome !== "playing";
+  // 成功通关的故事不再提供回退：要再体验一次，只能回书架换角色。
+  const completed = adventure.outcome === "success";
 
   return (
     <div className="min-h-screen py-6 px-4">
@@ -104,8 +106,8 @@ export function GamePhase({
           characterName={character.name}
           saveState={saveState}
           turn={adventure.turn}
-          snapshotCount={adventure.snapshots.length}
-          canUndo={canUndo}
+          snapshotCount={completed ? 0 : adventure.snapshots.length}
+          canUndo={canUndo && !completed}
           onUndo={handleUndo}
           onExport={onExport}
           onSwitchCharacter={resetToSelect}

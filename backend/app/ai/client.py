@@ -1,7 +1,14 @@
 from collections.abc import AsyncIterator, Sequence
+from typing import Any
 
 import httpx
-from openai import AsyncOpenAI
+from openai import (
+    AsyncOpenAI,
+    AuthenticationError,
+    BadRequestError,
+    PermissionDeniedError,
+    RateLimitError,
+)
 
 from app.ai.resolve import ResolvedAiConfig
 from app.ai.url import models_url
@@ -10,12 +17,28 @@ from app.schemas import ChatMessage
 
 _USER_AGENT = "novel-ai/1.0"
 
+# SDK 自带指数退避重试，这里显式写出来，避免默认值随版本变化。
+MAX_RETRIES = 2
+# 连接阶段不应该等满整个读超时：地址写错时要尽快报错。
+CONNECT_TIMEOUT = 10.0
+
+# 这些错误重试或回退都没有意义，直接抛给上层转成可读文案。
+_NO_FALLBACK = (AuthenticationError, PermissionDeniedError, RateLimitError)
+
+
+def _timeout(config: ResolvedAiConfig) -> httpx.Timeout:
+    return httpx.Timeout(
+        config.timeout,
+        connect=min(CONNECT_TIMEOUT, config.timeout),
+    )
+
 
 def _create_client(config: ResolvedAiConfig) -> AsyncOpenAI:
     return AsyncOpenAI(
         base_url=config.base_url,
         api_key=config.api_key or "sk-local",
-        timeout=config.timeout,
+        timeout=_timeout(config),
+        max_retries=MAX_RETRIES,
         default_headers={"User-Agent": _USER_AGENT},
     )
 
@@ -33,21 +56,49 @@ def _completion_text(response: object) -> str:
     return content if isinstance(content, str) else ""
 
 
+def _request_options(
+    model: str,
+    messages: Sequence[ChatMessage],
+    temperature: float,
+    max_tokens: int | None,
+    stream: bool,
+) -> dict[str, Any]:
+    options: dict[str, Any] = {
+        "model": model,
+        "messages": _message_dicts(messages),
+        "temperature": temperature,
+        "stream": stream,
+    }
+    if max_tokens and max_tokens > 0:
+        options["max_tokens"] = max_tokens
+    return options
+
+
+async def _create_completion(client: AsyncOpenAI, options: dict[str, Any]) -> Any:
+    """个别模型（如 o 系列）不接受 max_tokens，退回不带该参数的请求。"""
+    try:
+        return await client.chat.completions.create(**options)
+    except BadRequestError as exc:
+        if "max_tokens" not in options or "max_tokens" not in str(exc).lower():
+            raise
+        retry_options = {key: value for key, value in options.items() if key != "max_tokens"}
+        return await client.chat.completions.create(**retry_options)
+
+
 async def stream_chat(
     config: ResolvedAiConfig,
     messages: Sequence[ChatMessage],
     *,
     temperature: float = 0.7,
+    max_tokens: int | None = None,
 ) -> AsyncIterator[str]:
     client = _create_client(config)
     emitted = False
     try:
         try:
-            stream = await client.chat.completions.create(
-                model=config.model,
-                messages=_message_dicts(messages),
-                temperature=temperature,
-                stream=True,
+            stream = await _create_completion(
+                client,
+                _request_options(config.model, messages, temperature, max_tokens, True),
             )
             async for chunk in stream:
                 if not chunk.choices:
@@ -56,14 +107,14 @@ async def stream_chat(
                 if content:
                     emitted = True
                     yield content
-        except Exception:
-            if emitted:
+        except Exception as exc:
+            # 鉴权/额度类错误重试同样的请求只会再失败一次，直接上报。
+            if emitted or isinstance(exc, _NO_FALLBACK):
                 raise
-            response = await client.chat.completions.create(
-                model=config.model,
-                messages=_message_dicts(messages),
-                temperature=temperature,
-                stream=False,
+            # 部分兼容接口不支持流式：退回一次性请求，别让整轮冒险失败。
+            response = await _create_completion(
+                client,
+                _request_options(config.model, messages, temperature, max_tokens, False),
             )
             text = _completion_text(response)
             if text:
@@ -81,12 +132,9 @@ async def chat_once(
 ) -> str:
     client = _create_client(config)
     try:
-        response = await client.chat.completions.create(
-            model=config.model,
-            messages=_message_dicts(messages),
-            temperature=temperature,
-            max_tokens=max_tokens,
-            stream=False,
+        response = await _create_completion(
+            client,
+            _request_options(config.model, messages, temperature, max_tokens, False),
         )
         return _completion_text(response)
     finally:
