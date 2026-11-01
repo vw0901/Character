@@ -1,6 +1,5 @@
+import { DEFAULT_STATS, STAT_MAX, STAT_MIN, clamp } from "../rules";
 import type { StatValues } from "../types";
-
-export const DEFAULT_STATS: StatValues = { health: 100, power: 50, reputation: 50 };
 
 export function asRecord(value: unknown): Record<string, unknown> | null {
   return value !== null && typeof value === "object" && !Array.isArray(value)
@@ -23,10 +22,6 @@ export function numberValue(value: unknown, fallback = 0): number {
   return Number.isFinite(parsed) ? parsed : fallback;
 }
 
-export function clamp(value: number, min: number, max: number): number {
-  return Math.min(max, Math.max(min, value));
-}
-
 export function stringList(value: unknown): string[] {
   if (Array.isArray(value)) {
     return value.map((item) => text(item)).filter(Boolean);
@@ -38,12 +33,20 @@ export function stringList(value: unknown): string[] {
 export function normalizeStats(value: unknown): StatValues {
   const record = asRecord(value) ?? {};
   return {
-    health: clamp(Math.round(numberValue(record.health, DEFAULT_STATS.health)), 0, 100),
-    power: clamp(Math.round(numberValue(record.power, DEFAULT_STATS.power)), 0, 100),
+    health: clamp(
+      Math.round(numberValue(record.health, DEFAULT_STATS.health)),
+      STAT_MIN,
+      STAT_MAX
+    ),
+    power: clamp(
+      Math.round(numberValue(record.power, DEFAULT_STATS.power)),
+      STAT_MIN,
+      STAT_MAX
+    ),
     reputation: clamp(
       Math.round(numberValue(record.reputation, DEFAULT_STATS.reputation)),
-      0,
-      100
+      STAT_MIN,
+      STAT_MAX
     ),
   };
 }

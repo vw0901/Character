@@ -8,13 +8,15 @@ interface StoryStatusProps {
 }
 
 export function StoryStatus({ goal, timeline, outcome }: StoryStatusProps) {
+  const playing = outcome === "playing";
   const remaining = daysRemaining(timeline);
-  const overdue = timeline.currentDay > timeline.totalDays;
+  // 结局之后再显示「已超时」会和「达成最终目标」自相矛盾，这里只在进行中提示超时。
+  const overdue = playing && timeline.currentDay > timeline.totalDays;
   const percent = Math.min(
     100,
     Math.max(0, Math.round((timeline.currentDay / Math.max(1, timeline.totalDays)) * 100))
   );
-  const urgent = outcome === "playing" && remaining <= 3;
+  const urgent = playing && remaining <= 3;
 
   return (
     <div className="mb-6 rounded-xl border border-border bg-card p-4">
@@ -51,11 +53,13 @@ export function StoryStatus({ goal, timeline, outcome }: StoryStatusProps) {
             />
           </div>
           <p className={`mt-1 text-[11px] ${urgent || overdue ? "text-crimson" : "text-muted-foreground"}`}>
-            {overdue
-              ? `已超时 ${timeline.currentDay - timeline.totalDays} 天`
-              : remaining > 0
-                ? `剩余 ${remaining} 天`
-                : "最后一天"}
+            {!playing
+              ? "本局已结束"
+              : overdue
+                ? `已超时 ${timeline.currentDay - timeline.totalDays} 天`
+                : remaining > 0
+                  ? `剩余 ${remaining} 天`
+                  : "最后一天"}
           </p>
         </div>
       </div>

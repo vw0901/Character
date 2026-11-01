@@ -69,6 +69,14 @@ class GameActionRequest(APIModel):
     ai_config: AiConfig | None = Field(default=None, alias="aiConfig")
 
 
+class GameGoalCheckRequest(APIModel):
+    goal: dict[str, Any]
+    narration: str = ""
+    scene: dict[str, Any] | None = None
+    history: list[dict[str, Any]] = Field(default_factory=list)
+    ai_config: AiConfig | None = Field(default=None, alias="aiConfig")
+
+
 class RepairRequest(APIModel):
     bible: dict[str, Any]
     check: dict[str, Any] | None = None

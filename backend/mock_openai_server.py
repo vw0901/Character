@@ -130,6 +130,17 @@ def _system_prompt(messages: list[dict[str, Any]]) -> str:
 
 
 def _response_text(system_prompt: str, user_prompt: str) -> str:
+    if "剧情审校员" in system_prompt:
+        achieved = "成功" in user_prompt
+        return json.dumps(
+            {
+                "achieved": achieved,
+                "confidence": "high" if achieved else "medium",
+                "reason": "测试判定",
+            },
+            ensure_ascii=False,
+            separators=(",", ":"),
+        )
     if "小说设定修补师" in system_prompt:
         return json.dumps(REPAIR, ensure_ascii=False, separators=(",", ":"))
     if "小说设定审计师" in system_prompt:

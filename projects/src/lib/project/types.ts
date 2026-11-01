@@ -1,6 +1,6 @@
 export const PROJECT_FORMAT = "if-it-were-you/project";
 export const PROJECT_FORMAT_VERSION = 2;
-export const APP_VERSION = "0.3.0";
+export const APP_VERSION = "0.3.1";
 export const MAX_UNDO_SNAPSHOTS = 20;
 
 export interface SearchResult {
@@ -139,6 +139,15 @@ export interface SceneResult {
   daysPassed: number;
   goalAchieved: boolean;
   endingText?: string;
+}
+
+export type GoalCheckConfidence = "high" | "medium" | "low";
+
+/** 每轮剧情结束后，由独立的判定请求复核「最终目标是否已经完成」。 */
+export interface GoalCheckVerdict {
+  achieved: boolean;
+  confidence: GoalCheckConfidence;
+  reason: string;
 }
 
 export interface StoryGoal {

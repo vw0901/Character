@@ -1,7 +1,7 @@
+import { clamp } from "../rules";
 import {
   asArray,
   asRecord,
-  clamp,
   numberValue,
   stringList,
   text,

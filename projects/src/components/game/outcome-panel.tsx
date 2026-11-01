@@ -1,4 +1,4 @@
-import { Heart, RotateCcw, Skull, Star, Trophy, Undo2, Zap } from "lucide-react";
+import { BookOpen, Heart, RotateCcw, Skull, Star, Trophy, Undo2, Users, Zap } from "lucide-react";
 import type { AdventureOutcome, StatValues } from "@/lib/project";
 
 interface OutcomePanelProps {
@@ -41,6 +41,12 @@ export function OutcomePanel({
         <p className="text-muted-foreground mb-8 max-w-md mx-auto leading-relaxed">{endingText}</p>
       )}
 
+      {success && (
+        <p className="text-sm text-muted-foreground mb-6 max-w-md mx-auto leading-relaxed">
+          这段故事已经完结。你可以接着开启同一角色的下一段故事，或去书架选择其他故事和人物。
+        </p>
+      )}
+
       <div className="flex items-center justify-center gap-4 mb-6">
         <div className="text-center">
           <Heart className="w-5 h-5 text-crimson mx-auto mb-1" />
@@ -65,19 +71,40 @@ export function OutcomePanel({
           <Undo2 className="w-4 h-4" />
           回退一步
         </button>
-        <button
-          onClick={onRestartBook}
-          className="inline-flex items-center gap-2 px-6 py-3 border border-border text-muted-foreground font-medium rounded-lg hover:border-amber/40 hover:text-parchment transition-colors"
-        >
-          <RotateCcw className="w-4 h-4" />
-          重开本角色
-        </button>
-        <button
-          onClick={onLeave}
-          className="px-8 py-3 bg-amber text-ink font-medium rounded-lg hover:bg-amber-light transition-colors"
-        >
-          换一本故事书
-        </button>
+        {success ? (
+          <>
+            <button
+              onClick={onRestartBook}
+              className="inline-flex items-center gap-2 px-8 py-3 bg-amber text-ink font-medium rounded-lg hover:bg-amber-light transition-colors"
+            >
+              <BookOpen className="w-4 h-4" />
+              进入下一段故事
+            </button>
+            <button
+              onClick={onLeave}
+              className="inline-flex items-center gap-2 px-6 py-3 border border-border text-muted-foreground font-medium rounded-lg hover:border-amber/40 hover:text-parchment transition-colors"
+            >
+              <Users className="w-4 h-4" />
+              选择其他故事或人物
+            </button>
+          </>
+        ) : (
+          <>
+            <button
+              onClick={onRestartBook}
+              className="inline-flex items-center gap-2 px-6 py-3 border border-border text-muted-foreground font-medium rounded-lg hover:border-amber/40 hover:text-parchment transition-colors"
+            >
+              <RotateCcw className="w-4 h-4" />
+              重开本角色
+            </button>
+            <button
+              onClick={onLeave}
+              className="px-8 py-3 bg-amber text-ink font-medium rounded-lg hover:bg-amber-light transition-colors"
+            >
+              换一本故事书
+            </button>
+          </>
+        )}
       </div>
     </div>
   );

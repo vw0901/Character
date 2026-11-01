@@ -1,4 +1,4 @@
-export { DEFAULT_STATS, parseJsonLoose } from "./json";
+export { parseJsonLoose } from "./json";
 export {
   normalizeBible,
   normalizeCheck,
@@ -9,6 +9,7 @@ export {
   normalizeAdventure,
   normalizeGameOpening,
   normalizeGameState,
+  normalizeGoalCheck,
   normalizeScene,
   normalizeSceneResult,
   normalizeStoryGoal,

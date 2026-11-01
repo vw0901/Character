@@ -58,6 +58,7 @@ export function GamePhase({
     canUndo,
     isInitializing,
     isProcessing,
+    isVerifyingGoal,
     narration,
     displayedText,
     error,
@@ -171,6 +172,9 @@ export function GamePhase({
               displayedText={displayedText}
               liveIndex={liveIndex}
               isProcessing={isProcessing}
+              processingLabel={
+                isVerifyingGoal ? "正在判定本轮是否达成最终目标..." : undefined
+              }
             />
 
             {error && !isProcessing && (

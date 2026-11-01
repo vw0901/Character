@@ -210,6 +210,46 @@ def test_game_action_sse_contract(client: TestClient) -> None:
     assert payload["goalAchieved"] is False
 
 
+def test_game_goal_check_contract(client: TestClient) -> None:
+    response = client.post(
+        "/api/game/goal-check",
+        json={
+            "goal": {"title": "找到妹妹", "description": "在血月前带她离开古桥"},
+            "narration": "你踏上湿滑的石桥，桥心站着一个戴斗笠的人。",
+            "scene": {"location": "桥心", "description": "河风卷起水雾。"},
+            "history": [{"type": "choice", "text": "过桥"}],
+        },
+    )
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["ok"] is True
+    assert payload["achieved"] is False
+    assert payload["confidence"] in {"high", "medium", "low"}
+
+
+def test_game_goal_check_detects_success(client: TestClient) -> None:
+    response = client.post(
+        "/api/game/goal-check",
+        json={
+            "goal": {"title": "找到妹妹", "description": "在血月前带她离开古桥"},
+            "narration": "你成功在血月升起前找到妹妹，并带着她离开了古桥。",
+        },
+    )
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["ok"] is True
+    assert payload["achieved"] is True
+
+
+def test_game_goal_check_requires_content(client: TestClient) -> None:
+    response = client.post(
+        "/api/game/goal-check",
+        json={"goal": {"title": "找到妹妹"}, "narration": "   "},
+    )
+    assert response.status_code == 400
+    assert response.json()["error"]
+
+
 def test_stream_falls_back_to_non_streaming(
     client: TestClient, mock_server: str
 ) -> None:

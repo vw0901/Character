@@ -1,4 +1,14 @@
-import { asArray, asRecord, clamp, numberValue, normalizeStats, text } from "./json";
+import { asArray, asRecord, normalizeStats, numberValue, text } from "./json";
+import {
+  DEFAULT_TOTAL_DAYS,
+  MAX_TOTAL_DAYS,
+  MIN_DAYS_PER_ACTION,
+  MIN_TOTAL_DAYS,
+  clamp,
+  clampDaysPerAction,
+  openingStats,
+  reconcilePlayingOutcome,
+} from "../rules";
 import {
   MAX_UNDO_SNAPSHOTS,
   type AdventureOutcome,
@@ -6,6 +16,7 @@ import {
   type AdventureState,
   type CharacterChoice,
   type GameState,
+  type GoalCheckVerdict,
   type HistoryEntry,
   type Scene,
   type SceneResult,
@@ -28,18 +39,62 @@ export function normalizeStoryGoal(value: unknown): StoryGoal {
   if (!title && !description) {
     return { title: "完成属于你的旅程", description: "在这个世界走到故事的终点。" };
   }
-  return { title, description };
+  return { title: title || "完成属于你的旅程", description };
 }
 
-export function normalizeStoryTimeline(value: unknown): StoryTimeline {
+interface TimelineBounds {
+  minTotal: number;
+  maxTotal: number;
+  /** 开局固定天数，避免模型让故事从中途开始。 */
+  forceDay?: number;
+}
+
+function buildTimeline(value: unknown, bounds: TimelineBounds): StoryTimeline {
   const record = asRecord(value) ?? {};
   const rawTotal = Math.round(numberValue(record.totalDays ?? record.total_days, 0));
-  const totalDays = rawTotal > 0 ? clamp(rawTotal, 1, 365) : DEFAULT_TIMELINE.totalDays;
-  const currentDay = Math.max(1, Math.round(numberValue(record.currentDay ?? record.current_day, 1)));
+  const totalDays =
+    rawTotal > 0 ? clamp(rawTotal, bounds.minTotal, bounds.maxTotal) : DEFAULT_TOTAL_DAYS;
+  const rawCurrent = Math.max(
+    1,
+    Math.round(numberValue(record.currentDay ?? record.current_day, 1))
+  );
   return {
     label: text(record.label) || DEFAULT_TIMELINE.label,
     totalDays,
-    currentDay,
+    currentDay: bounds.forceDay ?? rawCurrent,
+  };
+}
+
+/** 存档中的时间线保持宽容，避免旧存档被改写。 */
+export function normalizeStoryTimeline(value: unknown): StoryTimeline {
+  return buildTimeline(value, { minTotal: 1, maxTotal: 365 });
+}
+
+/**
+ * 开局时间线：强制落在 15-30 天，并从第 1 天开始。
+ * 模型给出 3 天或 365 天时，按提示词的约定收敛，保证目标有可完成的窗口。
+ */
+function normalizeOpeningTimeline(value: unknown): StoryTimeline {
+  return buildTimeline(value, {
+    minTotal: MIN_TOTAL_DAYS,
+    maxTotal: MAX_TOTAL_DAYS,
+    forceDay: 1,
+  });
+}
+
+/** 开局目标必须存在：没有目标的局无法判定胜负，只能要求重新生成。 */
+function normalizeOpeningGoal(value: unknown): StoryGoal | null {
+  // 兼容模型把 finalGoal 直接写成一句话的情况。
+  if (typeof value === "string") {
+    const title = text(value);
+    return title ? { title, description: "在时间线耗尽前达成这件事。" } : null;
+  }
+  const record = asRecord(value) ?? {};
+  const title = text(record.title);
+  if (!title) return null;
+  return {
+    title,
+    description: text(record.description) || "在时间线耗尽前达成这件事。",
   };
 }
 
@@ -106,10 +161,20 @@ export function normalizeGameOpening(value: unknown): GameOpening | null {
   const gameState = normalizeGameState(value);
   if (!record || !gameState) return null;
 
+  // 缺少目标、或开场没有任何可选行动，都是走不下去的死局。
+  const goal = normalizeOpeningGoal(record.finalGoal ?? record.final_goal);
+  if (!goal || gameState.currentScene.choices.length === 0) return null;
+
   return {
-    gameState,
-    goal: normalizeStoryGoal(record.finalGoal ?? record.final_goal),
-    timeline: normalizeStoryTimeline(record.timeline),
+    gameState: {
+      ...gameState,
+      playerCharacter: {
+        ...gameState.playerCharacter,
+        initialStats: openingStats(gameState.playerCharacter.initialStats),
+      },
+    },
+    goal,
+    timeline: normalizeOpeningTimeline(record.timeline),
   };
 }
 
@@ -119,16 +184,16 @@ export function normalizeSceneResult(value: unknown): SceneResult | null {
 
   const scene = normalizeScene(record.currentScene ?? record.current_scene, "scene");
   const narration = text(record.narration);
-  const isEnding = record.isEnding === true || record.is_ending === true;
-  const endingText = text(record.endingText ?? record.ending_text);
-  const endingType = normalizeEndingType(record.endingType ?? record.ending_type);
-  const daysPassed = clamp(
-    Math.round(numberValue(record.daysPassed ?? record.days_passed, 1)),
-    1,
-    30
-  );
   const goalAchieved =
     record.goalAchieved === true || record.goal_achieved === true;
+  // 目标达成后故事就该收束；模型漏写 isEnding 时按结局处理，避免多走一步。
+  const isEnding =
+    record.isEnding === true || record.is_ending === true || goalAchieved;
+  const endingText = text(record.endingText ?? record.ending_text);
+  const endingType = normalizeEndingType(record.endingType ?? record.ending_type);
+  const daysPassed = clampDaysPerAction(
+    numberValue(record.daysPassed ?? record.days_passed, MIN_DAYS_PER_ACTION)
+  );
 
   if (isEnding) {
     if (!narration && !endingText) return null;
@@ -144,7 +209,8 @@ export function normalizeSceneResult(value: unknown): SceneResult | null {
     };
   }
 
-  if (!scene || (!narration && scene.choices.length === 0)) return null;
+  // 非结局回合必须留下可执行的选项，否则玩家会卡在没有任何按钮的场景里。
+  if (!scene || scene.choices.length === 0) return null;
 
   return {
     narration,
@@ -161,6 +227,28 @@ export function normalizeSceneResult(value: unknown): SceneResult | null {
 function normalizeEndingType(value: unknown): "success" | "failure" | null {
   if (value === "success" || value === "failure") return value;
   return null;
+}
+
+/**
+ * 目标判定接口的返回：
+ * - `ok === false` 表示这次判定没做成（AI 报错或结果无法解析），交给本地兜底；
+ * - 成功解析时以 `achieved` 为准，`confidence` 只用于展示，不改变结论。
+ */
+export function normalizeGoalCheck(value: unknown): GoalCheckVerdict | null {
+  const record = asRecord(value);
+  if (!record || record.ok === false) return null;
+  if (typeof record.achieved !== "boolean") return null;
+
+  const confidence =
+    record.confidence === "high" || record.confidence === "medium"
+      ? record.confidence
+      : "low";
+
+  return {
+    achieved: record.achieved,
+    confidence,
+    reason: text(record.reason),
+  };
 }
 
 function normalizeStatsChange(record: Record<string, unknown>): Partial<StatValues> {
@@ -232,7 +320,7 @@ export function normalizeAdventure(value: unknown): AdventureState | null {
 
   const isEnding = record.isEnding === true;
 
-  return {
+  const adventure: AdventureState = {
     character,
     gameState: normalizeGameState(record.gameState ?? record.game_state),
     stats: normalizeStats(record.stats),
@@ -246,5 +334,21 @@ export function normalizeAdventure(value: unknown): AdventureState | null {
     timeline: normalizeStoryTimeline(record.timeline),
     outcome: normalizeOutcome(record.outcome, isEnding),
     outcomeReason: text(record.outcomeReason ?? record.outcome_reason),
+  };
+
+  // 旧存档或手工改过的存档可能还标着「进行中」，但按规则已经该判负。
+  const reconciled = reconcilePlayingOutcome({
+    outcome: adventure.outcome,
+    isEnding: adventure.isEnding,
+    stats: adventure.stats,
+    timeline: adventure.timeline,
+  });
+  if (reconciled.outcome === adventure.outcome) return adventure;
+
+  return {
+    ...adventure,
+    outcome: reconciled.outcome,
+    outcomeReason: reconciled.reason,
+    isEnding: true,
   };
 }

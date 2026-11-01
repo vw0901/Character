@@ -9,9 +9,17 @@ interface GameLogProps {
   displayedText: string;
   liveIndex: number;
   isProcessing: boolean;
+  /** 判定目标是否达成时的提示；不传则显示默认等待文案。 */
+  processingLabel?: string;
 }
 
-export function GameLog({ history, displayedText, liveIndex, isProcessing }: GameLogProps) {
+export function GameLog({
+  history,
+  displayedText,
+  liveIndex,
+  isProcessing,
+  processingLabel,
+}: GameLogProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -47,7 +55,9 @@ export function GameLog({ history, displayedText, liveIndex, isProcessing }: Gam
       {isProcessing && (
         <div className="flex items-center gap-2 text-muted-foreground">
           <Loader2 className="w-4 h-4 animate-spin" />
-          <span className="text-sm game-text">命运正在编织...</span>
+          <span className="text-sm game-text">
+            {processingLabel ?? "命运正在编织..."}
+          </span>
         </div>
       )}
     </div>

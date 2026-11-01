@@ -6,6 +6,7 @@ from app.ai.prompts.bible import build_messages as build_bible_messages
 from app.ai.prompts.check import build_messages as build_check_messages
 from app.ai.prompts.game import build_messages as build_game_messages
 from app.ai.prompts.game_action import build_messages as build_action_messages
+from app.ai.prompts.goal_check import build_messages as build_goal_check_messages
 from app.schemas import CharacterChoice, SearchResult
 
 
@@ -78,3 +79,23 @@ def test_game_action_prompt_carries_goal_and_timeline() -> None:
     user_content = messages[1].content
     assert "最终目标: 找到妹妹" in user_content
     assert "剩余 17 天" in user_content
+
+
+def test_goal_check_prompt_carries_goal_and_round() -> None:
+    messages = build_goal_check_messages(
+        {"title": "找到妹妹", "description": "在血月前带她离开古桥"},
+        "你终于找到妹妹，并把她带出了古桥。",
+        {"location": "古桥", "description": "血月刚刚升起。"},
+        [
+            {"type": "choice", "text": "过桥"},
+            {"type": "narration", "text": "桥心站着戴斗笠的人。"},
+        ],
+    )
+
+    assert "证据不明确时判 false" in messages[0].content
+    user_content = messages[1].content
+    assert "找到妹妹" in user_content
+    assert "在血月前带她离开古桥" in user_content
+    assert "你终于找到妹妹" in user_content
+    assert "玩家选择：过桥" in user_content
+    assert "血月刚刚升起" in user_content
