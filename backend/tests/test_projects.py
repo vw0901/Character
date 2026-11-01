@@ -241,6 +241,66 @@ def test_adventure_progress_roundtrip(client: TestClient) -> None:
     assert loaded["adventure"]["history"][1] == {"type": "choice", "text": "过桥"}
 
 
+def test_adventure_books_roundtrip(client: TestClient) -> None:
+    def book(name: str, goal: str, day: int, outcome: str, with_scene: bool) -> dict[str, Any]:
+        return {
+            "character": {"mode": "existing", "name": name, "background": "游侠"},
+            "gameState": {
+                "title": "测试冒险",
+                "intro": "开场",
+                "playerCharacter": {
+                    "name": name,
+                    "background": "游侠",
+                    "initialStats": {"health": 100, "power": 50, "reputation": 50},
+                },
+                "currentScene": {
+                    "id": "scene_1",
+                    "location": "古桥",
+                    "description": "",
+                    "choices": [{"id": "choice_1", "text": "过桥"}],
+                },
+            }
+            if with_scene
+            else None,
+            "stats": {"health": 80, "power": 50, "reputation": 40},
+            "history": [{"type": "narration", "text": "开场"}],
+            "isEnding": outcome != "playing",
+            "endingText": "",
+            "turn": 2,
+            "snapshots": [],
+            "startedAt": "2026-01-01T00:00:00.000Z",
+            "goal": {"title": goal, "description": "达成条件"},
+            "timeline": {"label": "血月降临前", "totalDays": 20, "currentDay": day},
+            "outcome": outcome,
+            "outcomeReason": "",
+        }
+
+    document = {
+        **PROJECT,
+        "novelName": "多角色存档",
+        "adventures": {
+            "bible:林澈": book("林澈", "找到妹妹", 3, "playing", True),
+            "custom:云中客": book("云中客", "离开古桥", 21, "failure", False),
+        },
+        "activeAdventureKey": "custom:云中客",
+        "adventure": None,
+    }
+
+    saved = client.put("/api/projects/多角色存档", json=document)
+    assert saved.status_code == 200
+
+    loaded = client.get("/api/projects/多角色存档").json()
+    assert set(loaded["adventures"]) == {"bible:林澈", "custom:云中客"}
+    assert loaded["activeAdventureKey"] == "custom:云中客"
+    assert loaded["adventures"]["bible:林澈"]["goal"]["title"] == "找到妹妹"
+    assert loaded["adventures"]["custom:云中客"]["timeline"]["currentDay"] == 21
+    assert loaded["adventures"]["custom:云中客"]["outcome"] == "failure"
+
+    listing = client.get("/api/projects").json()["projects"]
+    target = next(item for item in listing if item["id"] == "多角色存档")
+    assert target["hasAdventure"] is True
+
+
 def test_repair_sse_contract(client: TestClient) -> None:
     response = client.post(
         "/api/repair",

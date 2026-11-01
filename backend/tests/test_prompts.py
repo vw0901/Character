@@ -55,3 +55,26 @@ def test_game_action_prompt_matches_original() -> None:
         CharacterChoice.model_validate(data["characterChoice"]),
     )
     assert message_dicts(messages) == FIXTURES["game_action"]["messages"]
+
+
+def test_game_action_prompt_carries_goal_and_timeline() -> None:
+    messages = build_action_messages(
+        {"novelName": "测试小说"},
+        {
+            "currentScene": {
+                "id": "scene_1",
+                "location": "古桥",
+                "description": "",
+                "choices": [{"id": "choice_1", "text": "过桥"}],
+            },
+            "stats": {"health": 90, "power": 50, "reputation": 50},
+            "goal": {"title": "找到妹妹", "description": "在血月降临前找到妹妹"},
+            "timeline": {"label": "血月降临前", "totalDays": 20, "currentDay": 3},
+        },
+        "choice_1",
+        "过桥",
+        None,
+    )
+    user_content = messages[1].content
+    assert "最终目标: 找到妹妹" in user_content
+    assert "剩余 17 天" in user_content

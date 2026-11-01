@@ -185,6 +185,9 @@ def test_game_sse_contract(client: TestClient) -> None:
     payload = json.loads(sse_text(response))
     assert payload["title"] == "测试冒险"
     assert payload["currentScene"]["choices"]
+    assert payload["finalGoal"]["title"] == "在血月前找到失踪的妹妹"
+    assert payload["timeline"]["totalDays"] == 20
+    assert payload["timeline"]["currentDay"] == 1
 
 
 def test_game_action_sse_contract(client: TestClient) -> None:
@@ -203,6 +206,8 @@ def test_game_action_sse_contract(client: TestClient) -> None:
     payload = json.loads(sse_text(response))
     assert payload["currentScene"]["id"] == "scene_2"
     assert payload["isEnding"] is False
+    assert payload["daysPassed"] == 1
+    assert payload["goalAchieved"] is False
 
 
 def test_stream_falls_back_to_non_streaming(

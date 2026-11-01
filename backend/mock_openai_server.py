@@ -75,6 +75,15 @@ REPAIR = {
 GAME = {
     "title": "测试冒险",
     "intro": "你睁开眼，雨落在青石板上。",
+    "finalGoal": {
+        "title": "在血月前找到失踪的妹妹",
+        "description": "在血月降临前找到妹妹并带她离开古桥。",
+    },
+    "timeline": {
+        "label": "血月降临前",
+        "totalDays": 20,
+        "currentDay": 1,
+    },
     "playerCharacter": {
         "name": "林澈",
         "background": "游侠",
@@ -105,7 +114,10 @@ ACTION = {
         ],
     },
     "statsChange": {"health": -5, "power": 2, "reputation": 1},
+    "daysPassed": 1,
+    "goalAchieved": False,
     "isEnding": False,
+    "endingType": None,
     "endingText": "",
 }
 

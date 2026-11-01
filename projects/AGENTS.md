@@ -15,11 +15,13 @@
 ├── public/                 # 静态资源
 ├── src/
 │   ├── app/                # 页面路由与布局、全局样式
+│   │   └── settings/       # AI 服务设置页
 │   ├── components/         # 业务组件（UI 组件按需生成）
-│   ├── lib/
-│   │   ├── utils.ts        # 通用工具函数 (cn)
-│   │   └── ai/             # 浏览器 AI 配置与 SSE 解析
-│   └── app/settings/       # AI 服务设置页
+│   │   └── game/           # 冒险界面：角色选择、日志、状态条、选项、结局
+│   └── lib/
+│       ├── utils.ts        # 通用工具函数 (cn)
+│       ├── ai/             # 浏览器 AI 配置、SSE 解析与错误文案
+│       └── project/        # 存档类型、宽松解析（parse/）与本地读写
 ├── next.config.ts          # 静态导出（output: export）配置
 ├── components.json         # shadcn/ui 生成配置
 ├── package.json            # 项目依赖管理
@@ -27,6 +29,8 @@
 ```
 
 - 前端仅做静态导出，API 由同级 `../backend/` 的 FastAPI 提供；生产运行时不依赖 Node.js。
+- 冒险进度按角色保存在 `project.adventures`，角色键由 `characterKey()` 生成；改动存档结构时同步更新
+  `lib/project/types.ts` 与 `backend/app/version.py` 的存档格式版本。
 - 项目文件（如 app 目录、pages 目录、components 等）默认初始化到 `src/` 目录下。
 - 一键启动脚本与完整说明位于仓库根目录：`../start.py`、`../start.cmd`、`../README.md`。
 

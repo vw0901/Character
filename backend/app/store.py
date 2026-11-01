@@ -94,6 +94,9 @@ def _normalize_document(project_id: str, document: Any) -> dict[str, Any]:
     doc["updatedAt"] = _now()
     for key in ("search", "bible", "check", "repair", "adventure"):
         doc.setdefault(key, None)
+    # 每个角色一本故事书；旧存档的单个 adventure 仍然保留兼容。
+    doc.setdefault("adventures", {})
+    doc.setdefault("activeAdventureKey", None)
 
     try:
         encoded = json.dumps(doc, ensure_ascii=False, indent=2)
@@ -115,6 +118,16 @@ def _atomic_write(path: Path, text: str) -> None:
         finally:
             if tmp.exists():
                 tmp.unlink(missing_ok=True)
+
+
+def _has_adventure(document: dict[str, Any]) -> bool:
+    adventures = document.get("adventures")
+    if isinstance(adventures, dict):
+        for book in adventures.values():
+            if isinstance(book, dict) and book.get("gameState"):
+                return True
+    legacy = document.get("adventure")
+    return isinstance(legacy, dict) and bool(legacy.get("gameState"))
 
 
 def list_projects() -> list[dict[str, Any]]:
@@ -143,7 +156,7 @@ def list_projects() -> list[dict[str, Any]]:
                 "hasBible": bool(doc.get("bible")),
                 "hasCheck": bool(doc.get("check")),
                 "hasRepair": bool(doc.get("repair")),
-                "hasAdventure": bool((doc.get("adventure") or {}).get("gameState")),
+                "hasAdventure": _has_adventure(doc),
             }
         )
 

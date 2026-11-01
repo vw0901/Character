@@ -6,12 +6,21 @@ from app.schemas import CharacterChoice, ChatMessage
 
 SYSTEM_PROMPT = """你是一位文字冒险游戏大师，擅长将小说设定转化为沉浸式的文字冒险游戏。
 
-根据提供的设定圣经，生成游戏的初始场景。
+根据提供的设定圣经，生成游戏的初始场景，并为玩家扮演的角色定下最终目标与时间线。
 
 请严格按以下 JSON 格式输出（不要输出 markdown 代码块标记，直接输出 JSON）：
 {
   "title": "游戏标题",
-  "intro": "开场旇子（100-200字，有氛围感）",
+  "intro": "开场引子（100-200字，有氛围感）",
+  "finalGoal": {
+    "title": "最终目标（20字以内，具体可判定）",
+    "description": "达成条件（50字以内）"
+  },
+  "timeline": {
+    "label": "时间线名称（如：血月降临前）",
+    "totalDays": 20,
+    "currentDay": 1
+  },
   "playerCharacter": {
     "name": "角色名",
     "background": "背景故事",
@@ -50,7 +59,9 @@ SYSTEM_PROMPT = """你是一位文字冒险游戏大师，擅长将小说设定�
 2. 场景描述要生动具体，调动多种感官
 3. 选项要有意义，不同选择应该引向不同的发展方向
 4. 角色背景要与小说世界观贴合
-5. 直接输出 JSON，不要包含任何其他文字"""
+5. finalGoal 必须为这个角色量身定制、具体可判定（例如「在祭典前找到失踪的妹妹」），不要写「变强」「活下去」这类空泛目标；description 写清楚达成与失败的判断条件
+6. timeline 是本局故事的倒计时：label 说明时间压力来自什么事件，totalDays 取 15-30 天，currentDay 固定为 1；最终目标必须能在 totalDays 天内完成
+7. 直接输出 JSON，不要包含任何其他文字"""
 
 
 def build_messages(
@@ -79,6 +90,7 @@ def build_messages(
             [
                 "",
                 "请以这个角色的第一人称视角生成开场，把玩家就是这个角色本人。开场叙述和场景描述都要紧密结合这个角色的身份、能力与性格，令场景之间的进入脱离不会与角色设定冲突。",
+                "finalGoal 必须是这个角色自己最想完成的事，而不是泛泛的世界危机。",
             ]
         )
         character_context = "\n".join(lines)

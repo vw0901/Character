@@ -7,8 +7,10 @@ import {
   Gamepad2, ArrowRight, Zap, Wrench, SkipForward, Download,
 } from "lucide-react";
 import { withAiConfig } from "@/lib/ai/browser";
+import { errorMessage } from "@/lib/ai/error";
 import { readSseText } from "@/lib/ai/sse";
 import {
+  SAVE_LABELS,
   normalizeCheck,
   normalizeRepair,
   parseJsonLoose,
@@ -26,13 +28,6 @@ interface CheckDisplayProps {
   onStartGame: () => void;
   onExport: () => void;
 }
-
-const SAVE_LABELS: Record<SaveState, string> = {
-  idle: "未保存",
-  saving: "保存中…",
-  saved: "已保存到本机",
-  error: "保存失败",
-};
 
 export function CheckDisplay({
   project,
@@ -88,12 +83,7 @@ export function CheckDisplay({
         }
       } catch (err) {
         console.error("Check failed:", err);
-        const message = err instanceof Error ? err.message : "";
-        setError(
-          message && message !== "Failed to fetch"
-            ? message
-            : "漏洞体检失败，请检查 AI 服务配置后重试"
-        );
+        setError(errorMessage(err, "漏洞体检失败，请检查 AI 服务配置后重试"));
       } finally {
         checkInFlight.current = false;
         setIsChecking(false);
@@ -138,11 +128,8 @@ export function CheckDisplay({
         }
       } catch (err) {
         console.error("Repair failed:", err);
-        const message = err instanceof Error ? err.message : "";
         setRepairError(
-          message && message !== "Failed to fetch"
-            ? message
-            : "修补设定失败，可以重试或跳过修补直接开始冒险"
+          errorMessage(err, "修补设定失败，可以重试或跳过修补直接开始冒险")
         );
       } finally {
         repairInFlight.current = false;

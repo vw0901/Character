@@ -1,6 +1,6 @@
 export const PROJECT_FORMAT = "if-it-were-you/project";
-export const PROJECT_FORMAT_VERSION = 1;
-export const APP_VERSION = "0.2.0";
+export const PROJECT_FORMAT_VERSION = 2;
+export const APP_VERSION = "0.3.0";
 export const MAX_UNDO_SNAPSHOTS = 20;
 
 export interface SearchResult {
@@ -135,8 +135,24 @@ export interface SceneResult {
   currentScene: Scene;
   statsChange: Partial<StatValues>;
   isEnding: boolean;
+  endingType: "success" | "failure" | null;
+  daysPassed: number;
+  goalAchieved: boolean;
   endingText?: string;
 }
+
+export interface StoryGoal {
+  title: string;
+  description: string;
+}
+
+export interface StoryTimeline {
+  label: string;
+  totalDays: number;
+  currentDay: number;
+}
+
+export type AdventureOutcome = "playing" | "success" | "failure";
 
 export interface AdventureSnapshot {
   gameState: GameState;
@@ -145,6 +161,9 @@ export interface AdventureSnapshot {
   isEnding: boolean;
   endingText: string;
   turn: number;
+  timeline: StoryTimeline;
+  outcome: AdventureOutcome;
+  outcomeReason: string;
 }
 
 export interface AdventureState {
@@ -157,6 +176,10 @@ export interface AdventureState {
   turn: number;
   snapshots: AdventureSnapshot[];
   startedAt: string;
+  goal: StoryGoal;
+  timeline: StoryTimeline;
+  outcome: AdventureOutcome;
+  outcomeReason: string;
 }
 
 export interface ProjectDocument {
@@ -171,7 +194,8 @@ export interface ProjectDocument {
   bible: SettingBible | null;
   check: CheckResult | null;
   repair: RepairResult | null;
-  adventure: AdventureState | null;
+  adventures: Record<string, AdventureState>;
+  activeAdventureKey: string | null;
 }
 
 export interface ProjectSummary {

@@ -8,8 +8,10 @@ import {
   Download, RotateCcw, CheckCircle2,
 } from "lucide-react";
 import { withAiConfig } from "@/lib/ai/browser";
+import { errorMessage } from "@/lib/ai/error";
 import { readSseText } from "@/lib/ai/sse";
 import {
+  SAVE_LABELS,
   normalizeBible,
   parseJsonLoose,
   type ProjectDocument,
@@ -26,13 +28,6 @@ interface BibleDisplayProps {
   onExport: () => void;
   onRestart: () => void;
 }
-
-const SAVE_LABELS: Record<SaveState, string> = {
-  idle: "未保存",
-  saving: "保存中…",
-  saved: "已保存到本机",
-  error: "保存失败",
-};
 
 export function BibleDisplay({
   project,
@@ -108,12 +103,7 @@ export function BibleDisplay({
         }
       } catch (err) {
         console.error("Bible generation failed:", err);
-        const message = err instanceof Error ? err.message : "";
-        setError(
-          message && message !== "Failed to fetch"
-            ? message
-            : "生成设定圣经失败，请检查 AI 服务配置后重试"
-        );
+        setError(errorMessage(err, "生成设定圣经失败，请检查 AI 服务配置后重试"));
       } finally {
         inFlight.current = false;
         setIsGenerating(false);
