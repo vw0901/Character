@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import { Heart, Star, Zap } from "lucide-react";
 import type { StatValues } from "@/lib/project";
 
-export function StatBar({
+function StatBar({
   icon,
   value,
   color,

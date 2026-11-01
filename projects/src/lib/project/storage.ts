@@ -50,16 +50,7 @@ export async function saveProjectToServer(document: ProjectDocument): Promise<vo
   }
 }
 
-export async function deleteSavedProject(id: string): Promise<void> {
-  const response = await fetch(`/api/projects/${encodeURIComponent(id)}`, {
-    method: "DELETE",
-  });
-  if (!response.ok && response.status !== 404) {
-    throw new ProjectRequestError(await requestError(response, "删除存档失败"));
-  }
-}
-
-export function projectFileName(document: ProjectDocument): string {
+function projectFileName(document: ProjectDocument): string {
   const name = document.novelName.replace(/[\\/:*?"<>|]+/g, "-").slice(0, 40) || "项目";
   const stamp = (document.updatedAt || new Date().toISOString()).slice(0, 10);
   return `${name}-${stamp}.json`;

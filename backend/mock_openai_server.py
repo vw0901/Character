@@ -138,6 +138,8 @@ def _system_prompt(messages: list[dict[str, Any]]) -> str:
 def _response_text(system_prompt: str, user_prompt: str) -> str:
     if "后日谈" in system_prompt:
         return EPILOGUE
+    if "动作润色师" in system_prompt:
+        return "我压低呼吸，贴着桥栏拨开雨幕，看清斗笠下的那张脸。"
     if "剧情审校员" in system_prompt:
         achieved = "成功" in user_prompt
         return json.dumps(

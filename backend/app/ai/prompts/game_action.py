@@ -56,7 +56,8 @@ SYSTEM_PROMPT = """你是一位文字冒险游戏大师。玩家刚刚做出了�
 8. 每轮生成前先对照「最终目标 / 达成条件」核对：只要本轮 narration、currentScene.description 或 endingText 里已经在事实上完成了目标（条件全部满足，哪怕没出现「成功」二字），就必须立刻收束——goalAchieved=true、isEnding=true、endingType="success"，并在 endingText 写出成功结局；不能因为想继续写新场景而把它设为 false，也不能把已经完成的目标留到下一轮
 9. 如果本次 statsChange 会让生命值降到 0 或以下，isEnding=true、endingType="failure"，并写出失败结局；生命归零由前端最终裁定
 10. 时间线耗尽也由前端裁定失败，你不要因为剩余天数少就提前结束故事；但当剩余天数 ≤ 3 时，选项必须提供一条能直接冲向最终目标的路径
-11. 除第 8、9 条的情况外，isEnding 必须为 false；直接输出 JSON，不要包含任何其他文字"""
+11. 如果这次是玩家自己写下的行动（ID 以 custom 开头），必须让它真的发生：能做成就写过程与代价，做不到就写受阻、失败或引出新的麻烦；既不能无视它，也不能替玩家追加他没有写过的举动
+12. 除第 8、9 条的情况外，isEnding 必须为 false；直接输出 JSON，不要包含任何其他文字"""
 
 
 def build_messages(
@@ -115,9 +116,12 @@ def build_messages(
         sections.append(f"最近剧情（从早到晚）:\n{recent}")
 
     sections.append(f"当前游戏状态: {game_state_json}")
-    sections.append(
-        f"玩家选择了: {choice_text} (ID: {choice_id}){character_context}{goal_context}{timeline_context}"
-    )
+    # 玩家自己写的行动没有选项文字可依，报告里要说清楚，模型才不会当成选项处理。
+    if choice_id.startswith("custom"):
+        action_line = f"玩家自己写下的行动: {choice_text} (ID: {choice_id})"
+    else:
+        action_line = f"玩家选择了: {choice_text} (ID: {choice_id})"
+    sections.append(f"{action_line}{character_context}{goal_context}{timeline_context}")
 
     user_content = "\n\n".join(sections) + "\n\n请生成下一个场景。"
     return [

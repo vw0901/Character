@@ -1,5 +1,6 @@
 from typing import Any
 
+from app.ai.prompts.context import clip, format_history
 from app.schemas import CharacterChoice, ChatMessage
 
 
@@ -18,24 +19,6 @@ HISTORY_LIMIT = 12
 TEXT_LIMIT = 500
 
 
-def _clip(value: Any, limit: int = TEXT_LIMIT) -> str:
-    text = str(value or "").strip()
-    return text if len(text) <= limit else f"{text[:limit]}…"
-
-
-def _format_history(history: list[dict[str, Any]]) -> str:
-    rows: list[str] = []
-    for item in history[-HISTORY_LIMIT:]:
-        if not isinstance(item, dict):
-            continue
-        content = _clip(item.get("text") or item.get("content"))
-        if not content:
-            continue
-        kind = "玩家选择" if item.get("type") == "choice" else "剧情"
-        rows.append(f"- {kind}：{content}")
-    return "\n".join(rows)
-
-
 def _format_character(character: CharacterChoice | dict | None) -> str:
     choice = (
         character
@@ -49,17 +32,17 @@ def _format_character(character: CharacterChoice | dict | None) -> str:
 
     lines = [f"玩家扮演的角色：{choice.name}"]
     if choice.background:
-        lines.append(f"角色背景：{choice.background}")
+        lines.append(f"角色背景：{clip(choice.background, 120)}")
     if choice.abilities:
-        lines.append(f"角色能力：{choice.abilities}")
+        lines.append(f"角色能力：{clip(choice.abilities, 120)}")
     if choice.personality:
         lines.append(f"角色性格：{choice.personality}")
     return "\n".join(lines)
 
 
 def _format_goal(goal: dict[str, Any]) -> str:
-    title = _clip(goal.get("title"), 120) or "（未命名目标）"
-    description = _clip(goal.get("description"))
+    title = clip(goal.get("title"), 120) or "（未命名目标）"
+    description = clip(goal.get("description"), TEXT_LIMIT)
     lines = [f"最终目标：{title}"]
     if description:
         lines.append(f"达成条件：{description}")
@@ -71,7 +54,7 @@ def _format_timeline(timeline: dict[str, Any] | None) -> str:
         return ""
     total = timeline.get("totalDays", timeline.get("total_days"))
     current = timeline.get("currentDay", timeline.get("current_day"))
-    label = _clip(timeline.get("label"), 40) or "主线"
+    label = clip(timeline.get("label"), 40) or "主线"
     if not isinstance(total, (int, float)) or not isinstance(current, (int, float)):
         return f"时间线：{label}"
     return f"时间线：{label}，故事停在第 {int(current)} / {int(total)} 天"
@@ -81,9 +64,9 @@ def _format_outcome(outcome: str, reason: str, ending_text: str) -> str:
     label = "成功达成最终目标" if outcome == "success" else "失败"
     lines = [f"结局：{label}"]
     if reason:
-        lines.append(f"结局原因：{_clip(reason, 200)}")
+        lines.append(f"结局原因：{clip(reason, 200)}")
     if ending_text:
-        lines.append(f"结局正文：{_clip(ending_text, 800)}")
+        lines.append(f"结局正文：{clip(ending_text, 800)}")
     return "\n".join(lines)
 
 
@@ -97,7 +80,7 @@ def build_messages(
     ending_text: str = "",
     history: list[dict[str, Any]] | None = None,
 ) -> list[ChatMessage]:
-    novel = _clip(bible.get("novelName"), 120) if isinstance(bible, dict) else ""
+    novel = clip(bible.get("novelName"), 120) if isinstance(bible, dict) else ""
     sections: list[str] = []
     if novel:
         sections.append(f"【作品】\n{novel}")
@@ -115,7 +98,7 @@ def build_messages(
     if story_context:
         sections.append(f"【这一局的关键信息】\n{story_context}")
 
-    replay = _format_history(history or [])
+    replay = format_history(history, limit=HISTORY_LIMIT, text_limit=TEXT_LIMIT)
     if replay:
         sections.append(f"【故事回顾（节选）】\n{replay}")
 

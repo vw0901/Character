@@ -38,6 +38,10 @@ const GOAL_CHECK_TIMEOUT_MS = 20_000;
 /** 后日谈是整段故事的收尾，篇幅更长，给足时间但不要无限等待。 */
 const EPILOGUE_TIMEOUT_MS = 120_000;
 
+/** 选项要等本回合文字显示完才出现，打字机别开得太慢。 */
+const TYPING_INTERVAL_MS = 18;
+const TYPING_START_DELAY_MS = 120;
+
 interface GoalCheckParams {
   goal: StoryGoal;
   narration: string;
@@ -101,6 +105,8 @@ export function useGameSession({
   const [epilogueDraft, setEpilogueDraft] = useState("");
   const [narration, setNarration] = useState("");
   const [displayedText, setDisplayedText] = useState("");
+  // 本回合的文字还没显示完：这期间不弹选项，玩家先把剧情读完。
+  const [isTyping, setIsTyping] = useState(false);
   const [error, setError] = useState("");
   const typewriterRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const fullTextRef = useRef<string>("");
@@ -126,6 +132,9 @@ export function useGameSession({
   const endingText = adventure?.endingText ?? "";
   const currentScene = gameState?.currentScene;
   const canUndo = Boolean(adventure && adventure.snapshots.length > 0 && !isProcessing);
+  // 本回合文字是否还没显示完。用「已显示的文字是否等于整段叙述」判断，
+  // 不必等 isTyping 状态晚一帧更新，选项也不会抢先闪一下。
+  const typingNow = isTyping || (Boolean(narration) && displayedText !== narration);
 
   // 切换故事书时清掉上一本留下的临时状态（必须在开场 effect 之前）。
   useEffect(() => {
@@ -135,6 +144,7 @@ export function useGameSession({
     epilogueKeyRef.current = "";
     setNarration("");
     setDisplayedText("");
+    setIsTyping(false);
     setError("");
     setEpilogueError("");
     setEpilogueDraft("");
@@ -275,11 +285,15 @@ export function useGameSession({
 
   // Typewriter effect
   useEffect(() => {
-    if (!narration) return;
+    if (!narration) {
+      setIsTyping(false);
+      return;
+    }
 
     fullTextRef.current = narration;
     let index = 0;
     setDisplayedText("");
+    setIsTyping(true);
 
     if (typewriterRef.current) {
       clearTimeout(typewriterRef.current);
@@ -289,11 +303,13 @@ export function useGameSession({
       if (index < fullTextRef.current.length) {
         index++;
         setDisplayedText(fullTextRef.current.slice(0, index));
-        typewriterRef.current = setTimeout(type, 30);
+        typewriterRef.current = setTimeout(type, TYPING_INTERVAL_MS);
+      } else {
+        setIsTyping(false);
       }
     };
 
-    typewriterRef.current = setTimeout(type, 100);
+    typewriterRef.current = setTimeout(type, TYPING_START_DELAY_MS);
 
     return () => {
       if (typewriterRef.current) {
@@ -301,6 +317,16 @@ export function useGameSession({
       }
     };
   }, [narration]);
+
+  /** 不想等打字机：直接显示全文，选项随之出现。 */
+  const skipTyping = useCallback(() => {
+    if (typewriterRef.current) {
+      clearTimeout(typewriterRef.current);
+      typewriterRef.current = null;
+    }
+    setDisplayedText(fullTextRef.current);
+    setIsTyping(false);
+  }, []);
 
   const startAdventure = useCallback(
     (next: CharacterChoice) => {
@@ -599,6 +625,7 @@ export function useGameSession({
     isInitializing,
     isProcessing,
     isVerifyingGoal,
+    isTyping: typingNow,
     narration,
     displayedText,
     error,
@@ -606,6 +633,7 @@ export function useGameSession({
     handleChoice,
     handleUndo,
     handleWriteEpilogue,
+    skipTyping,
     resetToSelect,
   };
 }

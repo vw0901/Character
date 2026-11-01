@@ -303,6 +303,59 @@ def test_game_epilogue_requires_finished_story(client: TestClient) -> None:
     assert no_goal.status_code == 400
 
 
+def test_game_polish_contract(client: TestClient) -> None:
+    response = client.post(
+        "/api/game/polish",
+        json={
+            "bible": BIBLE,
+            "characterChoice": CHARACTER,
+            "goal": {"title": "找到妹妹", "description": "在血月前带她离开古桥"},
+            "scene": {"location": "古桥", "description": "雨幕中断桥横陈。"},
+            "text": "我把斗笠掀开看看他是谁",
+            "history": [
+                {"type": "choice", "text": "过桥"},
+                {"type": "narration", "text": "桥心站着戴斗笠的人。"},
+            ],
+        },
+    )
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["ok"] is True
+    assert "斗笠" in payload["text"]
+
+
+def test_game_polish_requires_text(client: TestClient) -> None:
+    response = client.post("/api/game/polish", json={"text": "   "})
+    assert response.status_code == 400
+    assert response.json()["error"]
+
+
+def test_polish_text_is_cleaned() -> None:
+    from app.routers.game_polish import clean_polish
+
+    assert clean_polish("润色：我掀开斗笠，看清他的脸。") == "我掀开斗笠，看清他的脸。"
+    assert clean_polish("```\n“我贴着桥栏后退了一步。”\n```") == "我贴着桥栏后退了一步。"
+    assert clean_polish("   ") == ""
+
+
+def test_game_action_accepts_custom_choice(client: TestClient) -> None:
+    response = client.post(
+        "/api/game/action",
+        json={
+            "bible": BIBLE,
+            "gameState": GAME_STATE,
+            "choiceId": "custom_1",
+            "choiceText": "我掀开斗笠，看清他的脸",
+            "history": [{"type": "narration", "text": "雨夜里你来到桥边。"}],
+            "characterChoice": CHARACTER,
+        },
+    )
+    assert response.status_code == 200
+    assert response.text.rstrip().endswith("data: [DONE]")
+    payload = json.loads(sse_text(response))
+    assert payload["currentScene"]["id"] == "scene_2"
+
+
 def test_stream_falls_back_to_non_streaming(
     client: TestClient, mock_server: str
 ) -> None:

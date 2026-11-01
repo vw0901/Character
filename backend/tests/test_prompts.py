@@ -8,6 +8,7 @@ from app.ai.prompts.epilogue import build_messages as build_epilogue_messages
 from app.ai.prompts.game import build_messages as build_game_messages
 from app.ai.prompts.game_action import build_messages as build_action_messages
 from app.ai.prompts.goal_check import build_messages as build_goal_check_messages
+from app.ai.prompts.polish import build_messages as build_polish_messages
 from app.schemas import CharacterChoice, SearchResult
 
 
@@ -123,6 +124,48 @@ def test_game_action_prompt_uses_digest_and_recent_history() -> None:
     assert "谨慎" not in user_content
     assert "最近剧情" in user_content
     assert "你在河滩上捡到一枚铜环。" in user_content
+
+
+def test_game_action_prompt_marks_custom_choice() -> None:
+    messages = build_action_messages(
+        {"novelName": "测试小说"},
+        {
+            "currentScene": {
+                "id": "scene_1",
+                "location": "古桥",
+                "description": "",
+                "choices": [{"id": "choice_1", "text": "过桥"}],
+            },
+            "stats": {"health": 90, "power": 50, "reputation": 50},
+        },
+        "custom_1",
+        "我掀开斗笠，看清他的脸",
+        None,
+    )
+    user_content = messages[1].content
+    assert "玩家自己写下的行动: 我掀开斗笠，看清他的脸" in user_content
+    assert "玩家选择了" not in user_content
+    # 系统提示词里要明确交代自填行动该怎么处理。
+    assert "custom" in messages[0].content
+
+
+def test_polish_prompt_carries_scene_and_text() -> None:
+    messages = build_polish_messages(
+        {"novelName": "测试小说", "genre": "奇幻"},
+        {"name": "林澈", "background": "游侠", "abilities": "剑术"},
+        {"title": "找到妹妹"},
+        {"location": "古桥", "description": "雨幕中断桥横陈。"},
+        "我把斗笠掀开看看他是谁",
+        [{"type": "narration", "text": "桥心站着戴斗笠的人。"}],
+    )
+    assert "动作润色师" in messages[0].content
+    user_content = messages[1].content
+    assert "测试小说" in user_content
+    assert "古桥" in user_content
+    assert "林澈" in user_content
+    assert "找到妹妹" in user_content
+    assert "桥心站着戴斗笠的人。" in user_content
+    assert "我把斗笠掀开看看他是谁" in user_content
 
 
 def test_goal_check_prompt_carries_goal_and_round() -> None:

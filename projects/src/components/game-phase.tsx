@@ -11,6 +11,7 @@ import type {
 } from "@/lib/project";
 import { CharacterSelect } from "./game/character-select";
 import { ChoiceList } from "./game/choice-list";
+import { CustomChoice } from "./game/custom-choice";
 import { GameHeader } from "./game/game-header";
 import { GameLog } from "./game/game-log";
 import { OutcomePanel } from "./game/outcome-panel";
@@ -63,6 +64,7 @@ export function GamePhase({
     isInitializing,
     isProcessing,
     isVerifyingGoal,
+    isTyping,
     narration,
     displayedText,
     error,
@@ -70,6 +72,7 @@ export function GamePhase({
     handleChoice,
     handleUndo,
     handleWriteEpilogue,
+    skipTyping,
     resetToSelect,
   } = useGameSession({
     bible,
@@ -182,6 +185,8 @@ export function GamePhase({
               processingLabel={
                 isVerifyingGoal ? "正在判定本轮是否达成最终目标..." : undefined
               }
+              isTyping={isTyping}
+              onSkipTyping={skipTyping}
             />
 
             {error && !isProcessing && (
@@ -211,8 +216,27 @@ export function GamePhase({
               />
             )}
 
-            {!ended && currentScene && !isProcessing && (
-              <ChoiceList scene={currentScene} onChoice={handleChoice} />
+            {/* 本回合文字显示完才亮出选项：先读完剧情，再做决定。
+                等待期间只隐藏不卸载，玩家手写的行动在失败后还能留着重试。 */}
+            {!ended && currentScene && (
+              <div
+                className={
+                  isProcessing || isTyping
+                    ? "hidden"
+                    : "animate-fade-in space-y-4"
+                }
+              >
+                <ChoiceList scene={currentScene} onChoice={handleChoice} />
+                <CustomChoice
+                  scene={currentScene}
+                  turn={adventure.turn}
+                  bible={bible}
+                  character={character}
+                  goal={adventure.goal}
+                  history={history}
+                  onChoice={handleChoice}
+                />
+              </div>
             )}
           </div>
         )}

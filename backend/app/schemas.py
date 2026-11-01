@@ -78,6 +78,16 @@ class GameGoalCheckRequest(APIModel):
     ai_config: AiConfig | None = Field(default=None, alias="aiConfig")
 
 
+class GamePolishRequest(APIModel):
+    text: str
+    bible: dict[str, Any] = Field(default_factory=dict)
+    character_choice: CharacterChoice | None = Field(default=None, alias="characterChoice")
+    goal: dict[str, Any] | None = None
+    scene: dict[str, Any] | None = None
+    history: list[dict[str, Any]] = Field(default_factory=list)
+    ai_config: AiConfig | None = Field(default=None, alias="aiConfig")
+
+
 class GameEpilogueRequest(APIModel):
     bible: dict[str, Any] = Field(default_factory=dict)
     character_choice: CharacterChoice | None = Field(default=None, alias="characterChoice")

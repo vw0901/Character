@@ -1,5 +1,6 @@
 from typing import Any
 
+from app.ai.prompts.context import clip, format_history
 from app.schemas import ChatMessage
 
 
@@ -24,29 +25,11 @@ HISTORY_LIMIT = 8
 TEXT_LIMIT = 600
 
 
-def _clip(value: Any, limit: int = TEXT_LIMIT) -> str:
-    text = str(value or "").strip()
-    return text if len(text) <= limit else f"{text[:limit]}…"
-
-
-def _format_history(history: list[dict[str, Any]]) -> str:
-    rows: list[str] = []
-    for item in history[-HISTORY_LIMIT:]:
-        if not isinstance(item, dict):
-            continue
-        content = _clip(item.get("text") or item.get("content"))
-        if not content:
-            continue
-        kind = "玩家选择" if item.get("type") == "choice" else "剧情"
-        rows.append(f"- {kind}：{content}")
-    return "\n".join(rows)
-
-
 def _format_scene(scene: dict[str, Any] | None) -> str:
     if not isinstance(scene, dict):
         return ""
-    location = _clip(scene.get("location"), 80)
-    description = _clip(scene.get("description"))
+    location = clip(scene.get("location"), 80)
+    description = clip(scene.get("description"), TEXT_LIMIT)
     lines = [line for line in (location, description) if line]
     return "\n".join(lines)
 
@@ -57,8 +40,8 @@ def build_messages(
     scene: dict[str, Any] | None = None,
     history: list[dict[str, Any]] | None = None,
 ) -> list[ChatMessage]:
-    title = _clip(goal.get("title"), 120) or "（未命名目标）"
-    description = _clip(goal.get("description"))
+    title = clip(goal.get("title"), 120) or "（未命名目标）"
+    description = clip(goal.get("description"), TEXT_LIMIT)
 
     lines = [
         "【最终目标】",
@@ -67,11 +50,11 @@ def build_messages(
     if description:
         lines.extend(["", "【达成条件】", description])
 
-    recent = _format_history(history or [])
+    recent = format_history(history, limit=HISTORY_LIMIT, text_limit=TEXT_LIMIT)
     if recent:
         lines.extend(["", "【之前的剧情（仅作背景）】", recent])
 
-    lines.extend(["", "【本轮行动结果叙述】", _clip(narration) or "（本轮没有叙述）"])
+    lines.extend(["", "【本轮行动结果叙述】", clip(narration, TEXT_LIMIT) or "（本轮没有叙述）"])
 
     scene_text = _format_scene(scene)
     if scene_text:
